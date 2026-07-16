@@ -1,0 +1,15 @@
+{
+  "name": "mmm-messagecenter",
+  "version": "0.1.0",
+  "description": "Webhook-driven message center for MagicMirror² and MMM-pages",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

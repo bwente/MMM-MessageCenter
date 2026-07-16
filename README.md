@@ -1,0 +1,126 @@
+# MMM-MessageCenter
+
+MMM-MessageCenter is a webhook-driven message inbox for
+[MagicMirror²](https://magicmirror.builders/) installations using
+[MMM-pages](https://github.com/edward-shen/MMM-pages). It stores recent messages,
+shows optional toast alerts, raises an attention notification, and can temporarily
+switch pages for important events.
+
+## Installation
+
+From the MagicMirror `modules` directory:
+
+```sh
+git clone https://github.com/bwente/MMM-MessageCenter.git
+cd MMM-MessageCenter
+npm install --omit=dev
+```
+
+## Configuration
+
+```js
+{
+  module: "MMM-MessageCenter",
+  position: "middle_center",
+  classes: "message-center-page",
+  config: {
+    messagesPage: 4,
+    maxMessages: 50,
+    showToasts: true,
+    clearAttentionWhenViewed: true,
+    webhook: {
+      host: "127.0.0.1",
+      port: 8787,
+      token: ""
+    }
+  }
+}
+```
+
+Place the module class on the corresponding MMM-pages page:
+
+```js
+{
+  module: "MMM-pages",
+  config: {
+    modules: [
+      ["page-0"],
+      ["page-1"],
+      ["page-2"],
+      ["page-3"],
+      ["message-center-page"]
+    ]
+  }
+}
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
+| `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
+| `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
+| `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
+| `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. |
+| `webhook.port` | integer | `8787` | Webhook TCP port. |
+| `webhook.token` | string | `""` | Bearer token required for non-localhost listening. |
+
+Messages are stored only in memory and reset when MagicMirror restarts.
+
+## Sending messages
+
+The webhook accepts a JSON object at `POST /message`:
+
+```sh
+curl http://127.0.0.1:8787/message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "home-assistant",
+    "title": "Garage door open",
+    "body": "The garage door has been open for 10 minutes.",
+    "priority": "attention",
+    "actions": { "switchChannel": 4, "timeout": 10000 }
+  }'
+```
+
+To receive requests from another device, bind to a LAN address such as
+`"0.0.0.0"` and configure a strong token. Then include it with every request:
+
+```sh
+curl http://MIRROR_IP:8787/message \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test message"}'
+```
+
+Do not expose this webhook directly to the public internet.
+
+## Message schema
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Optional sender-provided identifier. |
+| `source` | string | Origin such as `home-assistant`. |
+| `title` | string | Message heading. |
+| `body` | string | Message details. |
+| `priority` | string | `ephemeral` or `attention`. |
+| `timestamp` | number | Epoch timestamp in milliseconds. |
+| `expires` | number | Optional expiration time in milliseconds. |
+| `actions.switchChannel` | integer | Optional MMM-pages target index. |
+| `actions.timeout` | number | Optional milliseconds before returning. |
+
+## Notifications
+
+MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
+`ATTENTION_OFF` when attention is cleared. Other modules may send `MC_ACK_ALL`
+to mark messages read or `MC_CLEAR_ALL` to empty the inbox.
+
+## Development
+
+```sh
+npm test
+```
+
+## License
+
+No license has been selected yet. Until one is added, the source is not granted
+for reuse or redistribution.
