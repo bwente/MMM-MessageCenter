@@ -1,5 +1,7 @@
 .messages-wrapper {
+  box-sizing: border-box;
   width: min(720px, calc(100vw - 48px));
+  margin-inline: auto;
   max-height: calc(100vh - 96px);
   padding: 0 0.25rem 1rem;
   overflow-y: auto;
