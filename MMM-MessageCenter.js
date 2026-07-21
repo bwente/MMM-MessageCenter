@@ -13,6 +13,27 @@ Module.register("MMM-MessageCenter", {
     showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
+    internalNotifications: {
+      enabled: true,
+      weather: {
+        enabled: false,
+        rain: {
+          enabled: true,
+          messageId: "rain-next-hour",
+          source: "magicmirror.weather",
+          entityId: "local-weather",
+          leadTimeMinutes: 60,
+          windowMinutes: 45,
+          probabilityThreshold: 50,
+          amountThreshold: 0.1,
+          urgency: "attention",
+          retention: "untilViewed",
+          channel: "weather",
+          timeout: 10000,
+          expiresAfterMinutes: 90
+        }
+      }
+    },
     webhook: {
       host: "127.0.0.1",
       port: 8787,
@@ -160,7 +181,7 @@ Module.register("MMM-MessageCenter", {
     return header;
   },
 
-  notificationReceived(notification, payload) {
+  notificationReceived(notification, payload, sender) {
     if (notification === "MAX_PAGES_CHANGED") {
       if (Number.isInteger(payload) && payload >= 0) this.maxPages = payload;
       return;
@@ -185,6 +206,7 @@ Module.register("MMM-MessageCenter", {
 
     if (notification === "MC_ACK_ALL") this.clearAttention();
     if (notification === "MC_CLEAR_ALL") this.clearMessages();
+    this.handleInternalNotification(notification, payload, sender);
   },
 
   socketNotificationReceived(notification, payload) {
@@ -194,7 +216,10 @@ Module.register("MMM-MessageCenter", {
     }
 
     if (notification !== "MC_MESSAGE") return;
+    this.receiveMessage(payload);
+  },
 
+  receiveMessage(payload) {
     const message = this.normalizeMessage(payload);
     if (!message) {
       Log.warn("[MMM-MessageCenter] Ignored invalid or expired message");
@@ -243,6 +268,120 @@ Module.register("MMM-MessageCenter", {
 
     if (this.config.pages) this.handlePageAction(message.actions);
     this.updateDom(200);
+  },
+
+  handleInternalNotification(notification, payload) {
+    const internalConfig = this.config.internalNotifications;
+    if (!internalConfig || internalConfig.enabled === false) return false;
+
+    if (notification === "WEATHER_UPDATED") {
+      return this.handleWeatherUpdated(payload);
+    }
+    return false;
+  },
+
+  handleWeatherUpdated(payload, now = Date.now()) {
+    const weatherConfig = this.getWeatherNotificationConfig();
+    if (!weatherConfig.enabled || !weatherConfig.rain.enabled) return false;
+    if (!payload || !Array.isArray(payload.hourlyArray) || !payload.hourlyArray.length) {
+      return false;
+    }
+
+    const rain = weatherConfig.rain;
+    const forecast = this.findRainForecast(payload.hourlyArray, now, rain);
+    if (!forecast) {
+      return this.resolveMessage(rain.source, rain.messageId);
+    }
+
+    const alreadyTracked = this.messages.some(
+      (message) => message.source === rain.source && message.id === rain.messageId
+    );
+    if (alreadyTracked) return true;
+
+    const location = payload.locationName ? ` near ${String(payload.locationName)}` : "";
+    const forecastTime = new Date(forecast.timestamp).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit"
+    });
+    this.receiveMessage({
+      id: rain.messageId,
+      type: "weather.precipitation",
+      source: rain.source,
+      entityId: rain.entityId,
+      title: "Rain approaching",
+      body: `Rain is expected${location} around ${forecastTime}.`,
+      urgency: rain.urgency,
+      retention: rain.retention,
+      timestamp: now,
+      expires: forecast.timestamp + rain.expiresAfterMinutes * 60000,
+      actions: {
+        switchChannel: rain.channel,
+        timeout: rain.timeout
+      }
+    });
+    return true;
+  },
+
+  getWeatherNotificationConfig() {
+    const defaults = this.defaults.internalNotifications.weather;
+    const configured = this.config.internalNotifications?.weather || {};
+    return {
+      ...defaults,
+      ...configured,
+      rain: {
+        ...defaults.rain,
+        ...(configured.rain || {})
+      }
+    };
+  },
+
+  findRainForecast(hourlyArray, now, config) {
+    const target = now + config.leadTimeMinutes * 60000;
+    const tolerance = config.windowMinutes * 60000;
+    return hourlyArray
+      .map((entry) => ({
+        entry,
+        timestamp: this.getWeatherTimestamp(entry?.date)
+      }))
+      .filter(
+        ({ entry, timestamp }) =>
+          timestamp !== null &&
+          timestamp > now &&
+          Math.abs(timestamp - target) <= tolerance &&
+          this.isRainForecast(entry, config)
+      )
+      .sort((left, right) =>
+        Math.abs(left.timestamp - target) - Math.abs(right.timestamp - target)
+      )[0] || null;
+  },
+
+  getWeatherTimestamp(value) {
+    if (Number.isFinite(value)) return value;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  },
+
+  isRainForecast(entry, config) {
+    if (!entry || typeof entry !== "object") return false;
+    const number = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const probability = number(entry.precipitationProbability);
+    const rain = number(entry.rain);
+    const snow = number(entry.snow);
+    const amount = number(entry.precipitationAmount);
+    const weatherType = String(entry.weatherType || "").toLowerCase();
+    const rainType = /(rain|shower|drizzle|thunderstorm)/.test(weatherType);
+    const snowOnly = /(snow|sleet|ice)/.test(weatherType) && !rainType;
+    const hasRainAmount =
+      (rain !== null && rain >= config.amountThreshold) ||
+      (!snowOnly &&
+        (snow === null || snow <= 0) &&
+        amount !== null &&
+        amount >= config.amountThreshold);
+    const likelyEnough = probability === null || probability >= config.probabilityThreshold;
+    return hasRainAmount || (rainType && likelyEnough);
   },
 
   handlePageAction(actions) {
@@ -401,6 +540,19 @@ Module.register("MMM-MessageCenter", {
     });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
+  },
+
+  resolveMessage(source, id) {
+    const previousAttentionState = this.getAttentionState();
+    const retained = this.messages.filter(
+      (message) => message.source !== source || message.id !== id
+    );
+    if (retained.length === this.messages.length) return false;
+
+    this.messages = retained;
+    this.publishAttention(previousAttentionState);
+    this.updateDom(200);
+    return true;
   },
 
   clearMessages() {

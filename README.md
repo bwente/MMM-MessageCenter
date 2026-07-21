@@ -50,12 +50,20 @@ npm install --omit=dev
     pages: true,
     attention: "seymour",
     messagesPage: 4,
+    channelRoutes: {
+      weather: 1
+    },
     maxMessages: 50,
     expirationSweepInterval: 60000,
     publishAttentionState: true,
     showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
+    internalNotifications: {
+      weather: {
+        enabled: true
+      }
+    },
     webhook: {
       host: "127.0.0.1",
       port: 8787,
@@ -95,11 +103,71 @@ Place the module class on the corresponding MMM-pages page:
 | `showHeader` | boolean | `true` | Show the inbox title, count, and touch-friendly acknowledgement control. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
+| `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |
+| `internalNotifications.weather.enabled` | boolean | `false` | Convert eligible default-weather forecasts into MessageCenter alerts. |
 | `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
 | `webhook.token` | string | `""` | Bearer token required for non-localhost listening. |
 
 Messages are stored only in memory and reset when MagicMirror restarts.
+
+## MagicMirror internal notifications
+
+MessageCenter can consume MagicMirror's internal module broadcasts directly.
+This keeps the notification experience useful without Home Assistant and lets
+existing modules remain the authoritative data providers.
+
+### Rain approaching
+
+The first internal provider listens for `WEATHER_UPDATED` from MagicMirror's
+default `weather` module. Enable it with:
+
+```js
+internalNotifications: {
+  weather: {
+    enabled: true,
+    rain: {
+      leadTimeMinutes: 60,
+      windowMinutes: 45,
+      probabilityThreshold: 50,
+      amountThreshold: 0.1,
+      channel: "weather",
+      timeout: 10000
+    }
+  }
+}
+```
+
+At least one default `weather` module instance must use `type: "hourly"`. That
+instance broadcasts the provider-neutral `hourlyArray` used by the rule. Other
+current or daily weather instances can coexist; their broadcasts do not contain
+hourly data and will not incorrectly clear an active alert.
+
+The default rule looks approximately one hour ahead, allowing a 45-minute
+tolerance for provider forecast intervals. It alerts for a rain weather type
+meeting the probability threshold or a forecast rain/precipitation amount
+meeting the amount threshold. Snow-only forecasts are ignored.
+
+Only one `rain-next-hour` event remains active at a time. Repeated weather
+refreshes do not repeat its toast or attention signal. A later hourly update
+without qualifying rain resolves the message and its attention state. As a
+safety net, the message expires 90 minutes after the matched forecast time.
+
+| Rain option | Default | Description |
+| --- | --- | --- |
+| `enabled` | `true` | Enable the rain rule when the weather provider is enabled. |
+| `leadTimeMinutes` | `60` | Forecast lead time to examine. |
+| `windowMinutes` | `45` | Allowed distance on either side of the target time. |
+| `probabilityThreshold` | `50` | Minimum rain probability percentage when using weather type. |
+| `amountThreshold` | `0.1` | Minimum numeric rain or precipitation amount. |
+| `urgency` | `"attention"` | Message urgency. |
+| `retention` | `"untilViewed"` | Message retention and acknowledgement policy. |
+| `channel` | `"weather"` | Semantic destination resolved through `channelRoutes`. |
+| `timeout` | `10000` | Milliseconds before returning to the prior channel. |
+| `expiresAfterMinutes` | `90` | Safety expiration measured from the forecast time. |
+
+Home Assistant may still send the same semantic message through the webhook.
+It is an optional provider rather than a runtime requirement.
 
 ## Sending messages
 

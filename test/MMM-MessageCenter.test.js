@@ -216,6 +216,205 @@ test("keeps identical ids from different sources", () => {
   assert.equal(module.messages.length, 2);
 });
 
+function weatherInstance(rain = {}) {
+  const module = instance({
+    channelRoutes: { weather: 2 },
+    internalNotifications: {
+      weather: {
+        enabled: true,
+        rain: { timeout: 0, ...rain }
+      }
+    }
+  });
+  module.maxPages = 6;
+  module.currentPage = 0;
+  return module;
+}
+
+test("turns a provider-neutral hourly rain forecast into a message", () => {
+  const module = weatherInstance();
+  const now = Date.now();
+
+  assert.equal(
+    module.handleWeatherUpdated(
+      {
+        locationName: "Baltimore",
+        providerName: "openmeteo",
+        hourlyArray: [
+          {
+            date: now + 60 * 60000,
+            weatherType: "rain",
+            precipitationProbability: 70,
+            precipitationAmount: 0.8
+          }
+        ]
+      },
+      now
+    ),
+    true
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].id, "rain-next-hour");
+  assert.equal(module.messages[0].type, "weather.precipitation");
+  assert.equal(module.messages[0].source, "magicmirror.weather");
+  assert.equal(module.messages[0].entityId, "local-weather");
+  assert.equal(module.messages[0].urgency, "attention");
+  assert.equal(module.messages[0].retention, "untilViewed");
+  assert.match(module.messages[0].body, /Baltimore/);
+  assert.equal(
+    module.notifications.some(
+      ({ name, payload }) => name === "PAGE_CHANGED" && payload === 2
+    ),
+    true
+  );
+});
+
+test("receives weather through the normal MagicMirror notification path", () => {
+  const module = weatherInstance();
+  const now = Date.now();
+
+  module.notificationReceived("WEATHER_UPDATED", {
+    hourlyArray: [
+      {
+        date: now + 60 * 60000,
+        rain: 0.5,
+        precipitationProbability: 65
+      }
+    ]
+  });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].type, "weather.precipitation");
+});
+
+test("leaves weather broadcasts disabled by default", () => {
+  const module = instance();
+  const now = Date.now();
+
+  module.notificationReceived("WEATHER_UPDATED", {
+    hourlyArray: [
+      {
+        date: now + 60 * 60000,
+        weatherType: "rain",
+        precipitationProbability: 90
+      }
+    ]
+  });
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("does not repeat a rain alert while the same event remains active", () => {
+  const module = weatherInstance();
+  const now = Date.now();
+  const payload = {
+    hourlyArray: [
+      {
+        date: now + 60 * 60000,
+        weatherType: "showers",
+        precipitationProbability: 80
+      }
+    ]
+  };
+
+  module.handleWeatherUpdated(payload, now);
+  module.handleWeatherUpdated(payload, now + 10 * 60000);
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(
+    module.notifications.filter(({ name }) => name === "SHOW_ALERT").length,
+    1
+  );
+});
+
+test("resolves the rain message when a later hourly update is dry", () => {
+  const module = weatherInstance();
+  const now = Date.now();
+
+  module.handleWeatherUpdated(
+    {
+      hourlyArray: [
+        {
+          date: now + 60 * 60000,
+          weatherType: "rain",
+          precipitationProbability: 75
+        }
+      ]
+    },
+    now
+  );
+  module.handleWeatherUpdated(
+    {
+      hourlyArray: [
+        {
+          date: now + 70 * 60000,
+          weatherType: "cloudy",
+          precipitationProbability: 10,
+          precipitationAmount: 0
+        }
+      ]
+    },
+    now + 10 * 60000
+  );
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.unreadAttentionCount, 0);
+  assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
+});
+
+test("ignores non-hourly weather broadcasts without clearing an alert", () => {
+  const module = weatherInstance();
+  module.messages = [
+    {
+      id: "rain-next-hour",
+      source: "magicmirror.weather",
+      urgency: "attention",
+      unread: true
+    }
+  ];
+  module.unreadAttentionCount = 1;
+
+  assert.equal(
+    module.handleWeatherUpdated({ currentWeather: {}, hourlyArray: [] }),
+    false
+  );
+  assert.equal(module.messages.length, 1);
+});
+
+test("does not treat snow or low-probability precipitation as rain", () => {
+  const module = weatherInstance();
+  const now = Date.now();
+
+  for (const forecast of [
+    {
+      date: now + 60 * 60000,
+      weatherType: "snow",
+      precipitationProbability: 90,
+      precipitationAmount: 2,
+      snow: 2
+    },
+    {
+      date: now + 60 * 60000,
+      weatherType: "rain",
+      precipitationProbability: 20,
+      precipitationAmount: 0
+    }
+  ]) {
+    assert.equal(module.findRainForecast([forecast], now, module.getWeatherNotificationConfig().rain), null);
+  }
+});
+
+test("can disable all internal MagicMirror notification providers", () => {
+  const module = instance({ internalNotifications: { enabled: false } });
+
+  assert.equal(
+    module.handleInternalNotification("WEATHER_UPDATED", { hourlyArray: [{}] }),
+    false
+  );
+  assert.equal(module.messages.length, 0);
+});
+
 test("prunes expired messages and publishes cleared attention state", () => {
   const module = instance({ showToasts: false });
   const now = Date.now();

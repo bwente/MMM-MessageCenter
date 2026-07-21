@@ -140,9 +140,13 @@ The module resolves semantic channels to the installed page indexes.
 
 ## Input providers
 
-The HTTP webhook is the first provider. Future providers may include:
+The HTTP webhook and MagicMirror's internal notification bus are the first
+providers. The default weather integration consumes provider-neutral
+`WEATHER_UPDATED` data and applies the first configurable forecast rule.
 
-- MagicMirror notifications;
+Future provider work may include:
+
+- additional rules for calendar, news, media, camera, and system notifications;
 - MQTT topics and Home Assistant entities;
 - calendars and scheduled reminders;
 - cameras and doorbells;
@@ -190,6 +194,8 @@ producers merely to control hardware.
 - individual and bulk acknowledgement;
 - structured attention-state event;
 - semantic channel destinations (implemented);
+- internal MagicMirror notification-provider foundation (implemented);
+- one-hour rain alert from the default weather module (implemented);
 - continued physical-device layout and interaction testing.
 
 ### Phase 3 — reliable and rich notifications
@@ -199,7 +205,7 @@ producers merely to control hardware.
 - configurable sounds and speech;
 - safe notification actions;
 - critical-alert and manual-acknowledgement policy;
-- provider separation for webhook, MQTT, and MagicMirror inputs.
+- transport adapters for webhook, MQTT, and other external inputs.
 
 ### Phase 4 — notification platform
 
