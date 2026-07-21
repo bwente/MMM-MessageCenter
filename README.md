@@ -1,10 +1,32 @@
 # MMM-MessageCenter
 
-MMM-MessageCenter is a webhook-driven message inbox for
-[MagicMirror²](https://magicmirror.builders/) installations using
-[MMM-pages](https://github.com/edward-shen/MMM-pages). It stores recent messages,
-shows optional toast alerts, raises an attention notification, and can temporarily
-switch pages for important events.
+MMM-MessageCenter is a centralized notification hub for
+[MagicMirror²](https://magicmirror.builders/). It receives, normalizes,
+prioritizes, and displays messages from Home Assistant, MagicMirror modules, and
+external systems so an installation can provide one calm, consistent
+notification experience.
+
+The project is intended to make MagicMirror behave less like a collection of
+dashboard widgets and more like an ambient information appliance. The current
+release provides a webhook, an in-memory message queue, toast alerts, semantic
+attention notifications, an optional inbox, and optional page routing through
+[MMM-pages](https://github.com/edward-shen/MMM-pages).
+
+MessageCenter does not control LEDs, speakers, GPIO, or other hardware. It
+publishes message and attention intent; integrations such as MMM-Seymour decide
+how that intent should be presented.
+
+## Design principles
+
+- One normalized entry point for household notifications.
+- Hardware-independent and usable by vanilla MagicMirror installations.
+- An optional UI rather than a required presentation layer.
+- Semantic events instead of device-specific commands.
+- Calm interactions that do not fight manual navigation.
+- A stable core message schema that can gain providers and presentation adapters.
+
+See the [living product roadmap](docs/ROADMAP.md) for the boundary between
+current behavior, near-term work, and exploratory ideas.
 
 ## Installation
 
@@ -62,7 +84,7 @@ Place the module class on the corresponding MMM-pages page:
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
-| `attention` | string | `"seymour"` | Emit Seymour attention notifications; use another value to disable them. |
+| `attention` | string | `"seymour"` | Compatibility switch for emitting generic attention notifications; use another value to disable them. This option will become integration-neutral. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
 | `showHeader` | boolean | `true` | Show the inbox title, count, and touch-friendly acknowledgement control. |
@@ -104,6 +126,10 @@ Do not expose this webhook directly to the public internet.
 
 ## Message schema
 
+The current schema is intentionally small. Its priority names blur urgency and
+retention even though the current queue stores both values. The roadmap separates
+those concepts without breaking existing senders.
+
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | string | Optional sender-provided identifier. |
@@ -131,6 +157,11 @@ These are ordinary MagicMirror notifications; MessageCenter does not control
 WLED or depend on a particular lighting implementation. MMM-Seymour may consume
 them as one attention source alongside Home Assistant, calendar, or other
 modules.
+
+Potential senders include Home Assistant, calendars, cameras, doorbells,
+weather services, household appliances, custom webhooks, and other MagicMirror
+modules. All senders should normalize into the same message contract rather than
+creating independent alert experiences.
 
 ## Development
 
