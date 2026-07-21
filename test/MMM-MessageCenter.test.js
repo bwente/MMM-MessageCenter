@@ -27,6 +27,7 @@ function instance(config = {}) {
     unreadAttentionCount: 0,
     returnTimer: null,
     autoNavigation: null,
+    expirationTimer: null,
     notifications,
     updateDom() {},
     sendNotification(name, payload) {
@@ -84,7 +85,7 @@ test("stores messages, raises attention, and shows a toast", () => {
   assert.equal(module.unreadAttentionCount, 1);
   assert.deepEqual(
     module.notifications.map(({ name }) => name),
-    ["ATTENTION_ON", "SHOW_ALERT"]
+    ["MESSAGE_CENTER_ATTENTION_CHANGED", "ATTENTION_ON", "SHOW_ALERT"]
   );
 });
 
@@ -113,6 +114,105 @@ test("attention count follows unread messages retained by the inbox", () => {
 
   assert.equal(module.unreadAttentionCount, 0);
   assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
+});
+
+test("replaces duplicate source and id messages with the newest copy", () => {
+  const module = instance({ showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "cycle-42",
+    source: "dishwasher",
+    title: "Running"
+  });
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "cycle-42",
+    source: "dishwasher",
+    title: "Complete"
+  });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].title, "Complete");
+});
+
+test("ignores an equivalent webhook retry without repeating its toast", () => {
+  const module = instance();
+  const payload = {
+    id: "cycle-42",
+    source: "dishwasher",
+    title: "Complete",
+    body: "The dishes are done"
+  };
+
+  module.socketNotificationReceived("MC_MESSAGE", payload);
+  module.socketNotificationReceived("MC_MESSAGE", payload);
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(
+    module.notifications.filter(({ name }) => name === "SHOW_ALERT").length,
+    1
+  );
+});
+
+test("keeps identical ids from different sources", () => {
+  const module = instance({ showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", { id: "open", source: "front-door" });
+  module.socketNotificationReceived("MC_MESSAGE", { id: "open", source: "garage" });
+
+  assert.equal(module.messages.length, 2);
+});
+
+test("prunes expired messages and publishes cleared attention state", () => {
+  const module = instance({ showToasts: false });
+  const now = Date.now();
+  module.messages = [
+    {
+      id: "leak",
+      source: "utility-room",
+      title: "Water detected",
+      priority: "attention",
+      unread: true,
+      expires: now - 1
+    },
+    {
+      id: "weather",
+      source: "weather",
+      title: "Cloudy",
+      priority: "ephemeral",
+      unread: false,
+      expires: now + 10000
+    }
+  ];
+  module.unreadAttentionCount = 1;
+
+  assert.equal(module.pruneExpiredMessages(now), true);
+  assert.deepEqual(module.messages.map(({ id }) => id), ["weather"]);
+  assert.equal(module.unreadAttentionCount, 0);
+  assert.deepEqual(module.notifications.map(({ name }) => name), [
+    "MESSAGE_CENTER_ATTENTION_CHANGED",
+    "ATTENTION_OFF"
+  ]);
+});
+
+test("publishes a structured attention snapshot", () => {
+  const module = instance({ showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "rain",
+    source: "weather",
+    title: "Rain starting",
+    priority: "attention"
+  });
+
+  assert.deepEqual(module.notifications[0], {
+    name: "MESSAGE_CENTER_ATTENTION_CHANGED",
+    payload: {
+      active: true,
+      unreadCount: 1,
+      highestPriority: "attention",
+      sources: ["weather"]
+    }
+  });
 });
 
 test("clears attention when the message page is viewed", () => {

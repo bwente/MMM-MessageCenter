@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MMM-MessageCenter 1024x600 preview</title>
+    <link rel="stylesheet" href="../MMM-MessageCenter.css">
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        width: 1024px;
+        height: 600px;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        color: #fff;
+        font-family: "Roboto Condensed", "Arial Narrow", sans-serif;
+      }
+      .preview-stage {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        place-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-stage">
+      <section class="messages-wrapper" aria-label="Message center">
+        <header class="messages-header">
+          <div class="messages-heading">
+            <h2 class="messages-title">Messages</h2>
+            <span class="messages-count" aria-label="5 messages">5</span>
+          </div>
+          <button class="messages-acknowledge" type="button">Mark all read</button>
+        </header>
+
+        <article class="message-item message-attention unread">
+          <div class="message-heading">
+            <h3 class="message-title">Front Door</h3>
+            <span class="message-unread-indicator">New</span>
+          </div>
+          <p class="message-body">Motion was detected at the front door.</p>
+          <div class="message-meta">
+            <span class="message-source">home-assistant</span>
+            <time class="message-time">8:42 PM</time>
+          </div>
+        </article>
+
+        <article class="message-item message-attention unread">
+          <div class="message-heading">
+            <h3 class="message-title">Rain starting soon</h3>
+            <span class="message-unread-indicator">New</span>
+          </div>
+          <p class="message-body">Light rain is expected in approximately 20 minutes.</p>
+          <div class="message-meta">
+            <span class="message-source">weather</span>
+            <time class="message-time">8:35 PM</time>
+          </div>
+        </article>
+
+        <article class="message-item message-ephemeral">
+          <div class="message-heading">
+            <h3 class="message-title">Dishwasher</h3>
+          </div>
+          <p class="message-body">The dishes are done.</p>
+          <div class="message-meta">
+            <span class="message-source">home-assistant</span>
+            <time class="message-time">8:17 PM</time>
+          </div>
+        </article>
+
+        <article class="message-item message-ephemeral">
+          <div class="message-heading">
+            <h3 class="message-title">Calendar</h3>
+          </div>
+          <p class="message-body">Dentist appointment tomorrow at 10:30 AM.</p>
+          <div class="message-meta">
+            <span class="message-source">calendar</span>
+            <time class="message-time">7:00 PM</time>
+          </div>
+        </article>
+
+        <article class="message-item message-ephemeral">
+          <div class="message-heading">
+            <h3 class="message-title">Laundry</h3>
+          </div>
+          <p class="message-body">The dryer cycle finished.</p>
+          <div class="message-meta">
+            <span class="message-source">home-assistant</span>
+            <time class="message-time">6:48 PM</time>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

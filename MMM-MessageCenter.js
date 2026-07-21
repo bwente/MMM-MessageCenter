@@ -7,6 +7,8 @@ Module.register("MMM-MessageCenter", {
     attention: "seymour",
     messagesPage: 4,
     maxMessages: 50,
+    expirationSweepInterval: 60000,
+    publishAttentionState: true,
     showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
@@ -28,14 +30,17 @@ Module.register("MMM-MessageCenter", {
     this.unreadAttentionCount = 0;
     this.returnTimer = null;
     this.autoNavigation = null;
+    this.expirationTimer = null;
 
     this.sendSocketNotification("MC_START", this.config.webhook);
     this.sendNotification("QUERY_PAGE_NUMBER");
+    this.startExpirationTimer();
     Log.info("[MMM-MessageCenter] Started");
   },
 
   stop() {
     this.cancelAutoNavigation();
+    this.stopExpirationTimer();
     this.sendSocketNotification("MC_STOP");
   },
 
@@ -195,18 +200,27 @@ Module.register("MMM-MessageCenter", {
       return;
     }
 
-    const previousUnreadCount = this.unreadAttentionCount;
+    const previousAttentionState = this.getAttentionState();
+    const duplicateIndex = message.hasExplicitId
+      ? this.messages.findIndex(
+          (stored) =>
+            stored.hasExplicitId &&
+            stored.source === message.source &&
+            stored.id === message.id
+        )
+      : -1;
+    if (duplicateIndex !== -1) {
+      const duplicate = this.messages[duplicateIndex];
+      if (this.isEquivalentMessage(duplicate, message)) {
+        Log.info(`[MMM-MessageCenter] Ignored duplicate ${message.source}/${message.id}`);
+        return;
+      }
+      this.messages.splice(duplicateIndex, 1);
+    }
+
     this.messages.unshift(message);
     this.messages = this.messages.slice(0, this.getMaxMessages());
-    this.unreadAttentionCount = this.messages.filter((stored) => stored.unread).length;
-
-    if (this.config.attention === "seymour") {
-      if (this.unreadAttentionCount > 0 && message.priority === "attention") {
-        this.sendNotification("ATTENTION_ON", this.unreadAttentionCount);
-      } else if (previousUnreadCount > 0 && this.unreadAttentionCount === 0) {
-        this.sendNotification("ATTENTION_OFF");
-      }
-    }
+    this.publishAttention(previousAttentionState);
 
     if (this.config.showToasts) {
       this.sendNotification("SHOW_ALERT", {
@@ -273,25 +287,107 @@ Module.register("MMM-MessageCenter", {
     this.returnTimer = null;
   },
 
+  startExpirationTimer() {
+    this.stopExpirationTimer();
+    const configuredInterval = Number(this.config.expirationSweepInterval);
+    if (!Number.isFinite(configuredInterval) || configuredInterval <= 0) return;
+
+    this.expirationTimer = setInterval(
+      () => this.pruneExpiredMessages(),
+      Math.max(1000, configuredInterval)
+    );
+  },
+
+  stopExpirationTimer() {
+    if (!this.expirationTimer) return;
+    clearInterval(this.expirationTimer);
+    this.expirationTimer = null;
+  },
+
+  pruneExpiredMessages(now = Date.now()) {
+    const previousAttentionState = this.getAttentionState();
+    const retained = this.messages.filter(
+      (message) => message.expires === null || message.expires > now
+    );
+    if (retained.length === this.messages.length) return false;
+
+    this.messages = retained;
+    this.publishAttention(previousAttentionState);
+    this.updateDom(200);
+    return true;
+  },
+
+  getAttentionState() {
+    const unreadMessages = this.messages.filter((message) => message.unread);
+    const sources = [...new Set(unreadMessages.map((message) => message.source))];
+    const highestPriority = unreadMessages.some((message) => message.priority === "critical")
+      ? "critical"
+      : unreadMessages.length
+        ? "attention"
+        : "passive";
+
+    return {
+      active: unreadMessages.length > 0,
+      unreadCount: unreadMessages.length,
+      highestPriority,
+      sources
+    };
+  },
+
+  publishAttention(previousState = null) {
+    const state = this.getAttentionState();
+    this.unreadAttentionCount = state.unreadCount;
+
+    const changed =
+      !previousState ||
+      previousState.active !== state.active ||
+      previousState.unreadCount !== state.unreadCount ||
+      previousState.highestPriority !== state.highestPriority ||
+      previousState.sources.join("\u0000") !== state.sources.join("\u0000");
+    if (!changed) return;
+
+    if (this.config.publishAttentionState !== false) {
+      this.sendNotification("MESSAGE_CENTER_ATTENTION_CHANGED", state);
+    }
+
+    if (this.config.attention === "seymour") {
+      if (state.active) this.sendNotification("ATTENTION_ON", state.unreadCount);
+      else if (previousState && previousState.active) this.sendNotification("ATTENTION_OFF");
+    }
+  },
+
   clearAttention() {
-    this.unreadAttentionCount = 0;
+    const previousAttentionState = this.getAttentionState();
     this.messages.forEach((message) => {
       message.unread = false;
     });
-    if (this.config.attention === "seymour") this.sendNotification("ATTENTION_OFF");
+    this.publishAttention(previousAttentionState);
     this.updateDom(200);
   },
 
   clearMessages() {
     this.cancelAutoNavigation();
+    const previousAttentionState = this.getAttentionState();
     this.messages = [];
-    this.clearAttention();
+    this.publishAttention(previousAttentionState);
+    this.updateDom(200);
   },
 
   getMaxMessages() {
     return Number.isInteger(this.config.maxMessages) && this.config.maxMessages > 0
       ? this.config.maxMessages
       : this.defaults.maxMessages;
+  },
+
+  isEquivalentMessage(left, right) {
+    return (
+      left.title === right.title &&
+      left.body === right.body &&
+      left.type === right.type &&
+      left.priority === right.priority &&
+      left.expires === right.expires &&
+      JSON.stringify(left.actions) === JSON.stringify(right.actions)
+    );
   },
 
   normalizeMessage(raw) {
@@ -308,8 +404,11 @@ Module.register("MMM-MessageCenter", {
     const priority = raw.priority === "attention" ? "attention" : "ephemeral";
     const actions = raw.actions && typeof raw.actions === "object" ? raw.actions : {};
 
+    const hasExplicitId = raw.id !== undefined && raw.id !== null && raw.id !== "";
+
     return {
-      id: String(raw.id || `${now}`),
+      id: hasExplicitId ? String(raw.id) : `${now}`,
+      hasExplicitId,
       type: String(raw.type || "generic"),
       source: String(raw.source || "unknown"),
       title: String(raw.title || "Message"),

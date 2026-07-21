@@ -51,6 +51,8 @@ npm install --omit=dev
     attention: "seymour",
     messagesPage: 4,
     maxMessages: 50,
+    expirationSweepInterval: 60000,
+    publishAttentionState: true,
     showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
@@ -87,6 +89,8 @@ Place the module class on the corresponding MMM-pages page:
 | `attention` | string | `"seymour"` | Compatibility switch for emitting generic attention notifications; use another value to disable them. This option will become integration-neutral. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
+| `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
+| `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
 | `showHeader` | boolean | `true` | Show the inbox title, count, and touch-friendly acknowledgement control. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
@@ -153,6 +157,10 @@ MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
 `ATTENTION_OFF` when attention is cleared. Other modules may send `MC_ACK_ALL`
 to mark messages read or `MC_CLEAR_ALL` to empty the inbox.
 
+It also emits `MESSAGE_CENTER_ATTENTION_CHANGED` with `active`, `unreadCount`,
+`highestPriority`, and `sources`. The structured event is the preferred contract
+for new integrations; the legacy events remain available for compatibility.
+
 These are ordinary MagicMirror notifications; MessageCenter does not control
 WLED or depend on a particular lighting implementation. MMM-Seymour may consume
 them as one attention source alongside Home Assistant, calendar, or other
@@ -168,6 +176,10 @@ creating independent alert experiences.
 ```sh
 npm test
 ```
+
+Open `dev/message-center-preview.html` in a browser to review a representative
+five-message inbox inside a fixed 1024x600 stage without sending live household
+events.
 
 ## License
 
