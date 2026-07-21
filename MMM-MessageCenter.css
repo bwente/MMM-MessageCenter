@@ -1,63 +1,25 @@
-.message-center {
-  width: min(720px, calc(100vw - 48px));
-  max-height: calc(100vh - 96px);
-  overflow-y: auto;
-  color: #fff;
+.messages-wrapper {
+  font-size: 1.1rem;
 }
 
-.message-center__heading {
-  margin: 0 0 20px;
-  font-size: 30px;
-  font-weight: 400;
-  text-align: left;
+.message-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-.message-center__empty {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.65);
-  text-align: left;
+.message-item.unread .message-title {
+  font-weight: 600;
 }
 
-.message-center__list {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.message-title {
+  font-size: 1.2rem;
 }
 
-.message-center__item {
-  padding: 16px 18px;
-  border-left: 4px solid rgba(255, 255, 255, 0.25);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.55);
-  text-align: left;
+.message-body {
+  opacity: 0.85;
 }
 
-.message-center__item.is-unread {
-  border-left-color: #ffb347;
-  background: rgba(48, 31, 10, 0.72);
-}
-
-.message-center__title,
-.message-center__body,
-.message-center__meta {
-  margin: 0;
-}
-
-.message-center__title {
-  font-size: 22px;
-  font-weight: 500;
-}
-
-.message-center__body {
-  margin-top: 6px;
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.message-center__meta {
-  margin-top: 10px;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 13px;
+.message-meta {
+  font-size: 0.8rem;
+  opacity: 0.5;
 }
