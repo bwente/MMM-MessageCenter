@@ -38,7 +38,7 @@
 
 .messages-count {
   min-width: 1.6rem;
-  padding: 0.15rem 0.4rem;
+  padding: 0.18rem 0.55rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
   font-size: 0.78rem;
@@ -46,7 +46,19 @@
   text-align: center;
 }
 
-.messages-acknowledge {
+.messages-count.has-unread {
+  background: rgba(255, 190, 72, 0.18);
+  color: rgb(255, 205, 112);
+}
+
+.messages-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.messages-acknowledge,
+.messages-clear-read {
   min-height: 44px;
   padding: 0.55rem 0.85rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -56,6 +68,10 @@
   font: inherit;
   font-size: 0.86rem;
   touch-action: manipulation;
+}
+
+.messages-clear-read {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .message-item {
@@ -133,7 +149,8 @@
   opacity: 0.5;
 }
 
-.messages-acknowledge:focus-visible {
+.messages-acknowledge:focus-visible,
+.messages-clear-read:focus-visible {
   outline: 3px solid rgba(255, 255, 255, 0.95);
   outline-offset: 3px;
 }
@@ -145,6 +162,10 @@
 
   .messages-header {
     padding-top: 0.4rem;
+  }
+
+  .messages-count {
+    font-size: 0.7rem;
   }
 
   .message-item {

@@ -133,7 +133,7 @@ Module.register("MMM-MessageCenter", {
 
       const source = document.createElement("span");
       source.className = "message-source";
-      source.textContent = message.source;
+      source.textContent = this.getMessageSourceLabel(message.source);
       meta.appendChild(source);
 
       const timestamp = document.createElement("time");
@@ -164,21 +164,62 @@ Module.register("MMM-MessageCenter", {
 
     const count = document.createElement("span");
     count.className = "messages-count";
-    count.textContent = String(this.messages.length);
-    count.setAttribute("aria-label", `${this.messages.length} messages`);
+    const counts = this.getMessageCounts();
+    count.textContent = counts.unread
+      ? `${counts.unread} new · ${counts.total} total`
+      : `${counts.total} ${counts.total === 1 ? "message" : "messages"}`;
+    count.setAttribute(
+      "aria-label",
+      counts.unread
+        ? `${counts.unread} unread, ${counts.total} total messages`
+        : `${counts.total} total messages, none unread`
+    );
+    if (counts.unread) count.classList.add("has-unread");
     heading.appendChild(count);
     header.appendChild(heading);
 
-    if (this.unreadAttentionCount > 0) {
+    const controls = document.createElement("div");
+    controls.className = "messages-controls";
+
+    if (counts.unread > 0) {
       const acknowledge = document.createElement("button");
       acknowledge.className = "messages-acknowledge";
       acknowledge.type = "button";
       acknowledge.textContent = "Mark all read";
       acknowledge.addEventListener("click", () => this.clearAttention());
-      header.appendChild(acknowledge);
+      controls.appendChild(acknowledge);
     }
 
+    if (counts.read > 0) {
+      const clearRead = document.createElement("button");
+      clearRead.className = "messages-clear-read";
+      clearRead.type = "button";
+      clearRead.textContent = "Clear read";
+      clearRead.addEventListener("click", () => this.clearRead());
+      controls.appendChild(clearRead);
+    }
+
+    if (controls.childNodes.length) header.appendChild(controls);
+
     return header;
+  },
+
+  getMessageCounts() {
+    const unread = this.messages.filter((message) => message.unread).length;
+    return {
+      total: this.messages.length,
+      unread,
+      read: this.messages.length - unread
+    };
+  },
+
+  getMessageSourceLabel(source) {
+    const labels = {
+      "magicmirror.weather": "Weather",
+      "home-assistant": "Home Assistant",
+      smartthings: "SmartThings"
+    };
+    return labels[source] || source;
   },
 
   notificationReceived(notification, payload, sender) {
@@ -205,6 +246,7 @@ Module.register("MMM-MessageCenter", {
     }
 
     if (notification === "MC_ACK_ALL") this.clearAttention();
+    if (notification === "MC_CLEAR_READ") this.clearRead();
     if (notification === "MC_CLEAR_ALL") this.clearMessages();
     this.handleInternalNotification(notification, payload, sender);
   },
@@ -531,6 +573,14 @@ Module.register("MMM-MessageCenter", {
     });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
+  },
+
+  clearRead() {
+    const retained = this.messages.filter((message) => message.unread);
+    if (retained.length === this.messages.length) return false;
+    this.messages = retained;
+    this.updateDom(200);
+    return true;
   },
 
   markViewed() {

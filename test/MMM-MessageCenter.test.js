@@ -188,6 +188,37 @@ test("replaces duplicate source and id messages with the newest copy", () => {
   assert.equal(module.messages[0].title, "Complete");
 });
 
+test("reports separate total, unread, and read history counts", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [
+    { unread: true },
+    { unread: false },
+    { unread: false }
+  ];
+
+  assert.deepEqual(module.getMessageCounts(), { total: 3, unread: 1, read: 2 });
+});
+
+test("clear read keeps unread messages and removes read history", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [
+    { id: "new", unread: true },
+    { id: "old", unread: false }
+  ];
+
+  assert.equal(module.clearRead(), true);
+  assert.deepEqual(module.messages.map(({ id }) => id), ["new"]);
+  assert.equal(module.clearRead(), false);
+});
+
+test("presents friendly labels for known internal sources", () => {
+  const module = instance();
+
+  assert.equal(module.getMessageSourceLabel("magicmirror.weather"), "Weather");
+  assert.equal(module.getMessageSourceLabel("home-assistant"), "Home Assistant");
+  assert.equal(module.getMessageSourceLabel("custom-source"), "custom-source");
+});
+
 test("ignores an equivalent webhook retry without repeating its toast", () => {
   const module = instance();
   const payload = {

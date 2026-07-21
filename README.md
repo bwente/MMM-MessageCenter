@@ -100,7 +100,7 @@ Place the module class on the corresponding MMM-pages page:
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
 | `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
 | `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
-| `showHeader` | boolean | `true` | Show the inbox title, count, and touch-friendly acknowledgement control. |
+| `showHeader` | boolean | `true` | Show the inbox title, explicit unread/total counts, and touch-friendly history controls. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
 | `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |
@@ -230,6 +230,11 @@ Viewing the inbox clears `untilViewed` attention. Messages marked
 marks them read. Messages remain in bounded in-memory history until they expire,
 are cleared, or are displaced by `maxMessages`.
 
+The header distinguishes unread attention from retained history. **Mark all
+read** acknowledges unread messages; **Clear read** removes only acknowledged
+history and preserves anything still unread. Known internal sources are shown
+with friendly labels, such as **Weather** instead of `magicmirror.weather`.
+
 A timed page action returns only while MessageCenter still owns the automatic
 navigation. Turning the encoder, touching another channel, or otherwise changing
 pages cancels the pending return so an alert cannot fight the user. Consecutive
@@ -239,7 +244,8 @@ timed alerts preserve the page that was visible before the first alert.
 
 MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
 `ATTENTION_OFF` when attention is cleared. Other modules may send `MC_ACK_ALL`
-to mark messages read or `MC_CLEAR_ALL` to empty the inbox.
+to mark messages read, `MC_CLEAR_READ` to remove acknowledged history while
+preserving unread messages, or `MC_CLEAR_ALL` to empty the inbox.
 
 It also emits `MESSAGE_CENTER_ATTENTION_CHANGED` with `active`, `unreadCount`,
 `highestUrgency`, `highestPriority` (compatibility alias), and `sources`. The
