@@ -1,10 +1,15 @@
 .messages-wrapper {
+  width: min(720px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  color: #fff;
   font-size: 1.1rem;
+  text-align: left;
 }
 
 .message-item {
   padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .message-item.unread .message-title {
@@ -12,14 +17,22 @@
 }
 
 .message-title {
+  margin: 0;
   font-size: 1.2rem;
 }
 
 .message-body {
+  margin: 0.35rem 0 0;
   opacity: 0.85;
 }
 
 .message-meta {
+  margin: 0.35rem 0 0;
   font-size: 0.8rem;
   opacity: 0.5;
+}
+
+.messages-empty {
+  margin: 0;
+  opacity: 0.65;
 }

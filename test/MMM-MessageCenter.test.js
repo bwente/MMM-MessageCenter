@@ -22,6 +22,7 @@ function instance(config = {}) {
       webhook: { ...definition.defaults.webhook, ...config.webhook }
     },
     currentPage: null,
+    maxPages: null,
     messages: [],
     unreadAttentionCount: 0,
     returnTimer: null,
@@ -113,12 +114,45 @@ test("ignores invalid page actions", () => {
   assert.equal(module.notifications.length, 0);
 });
 
+test("rejects pages outside the MMM-pages range", () => {
+  const module = instance();
+  module.notificationReceived("MAX_PAGES_CHANGED", 7);
+
+  module.handlePageAction({ switchChannel: 7 });
+  module.handlePageAction({ switchChannel: 99 });
+
+  assert.equal(module.notifications.length, 0);
+});
+
 test("switches to a valid page", () => {
   const module = instance();
 
   module.handlePageAction({ switchChannel: 4 });
 
   assert.deepEqual(module.notifications, [{ name: "PAGE_CHANGED", payload: 4 }]);
+});
+
+test("can disable automatic page actions", () => {
+  const module = instance({ pages: false, showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    title: "No page switch",
+    actions: { switchChannel: 4 }
+  });
+
+  assert.equal(module.notifications.some(({ name }) => name === "PAGE_CHANGED"), false);
+});
+
+test("can disable Seymour attention notifications", () => {
+  const module = instance({ attention: "none", showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    title: "Stored only",
+    priority: "attention"
+  });
+
+  assert.equal(module.unreadAttentionCount, 1);
+  assert.equal(module.notifications.some(({ name }) => name === "ATTENTION_ON"), false);
 });
 
 test("manual clear removes all messages and attention", () => {

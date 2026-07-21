@@ -24,6 +24,9 @@ npm install --omit=dev
   position: "middle_center",
   classes: "message-center-page",
   config: {
+    ui: "messages",
+    pages: true,
+    attention: "seymour",
     messagesPage: 4,
     maxMessages: 50,
     showToasts: true,
@@ -56,6 +59,9 @@ Place the module class on the corresponding MMM-pages page:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
+| `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
+| `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
+| `attention` | string | `"seymour"` | Emit Seymour attention notifications; use another value to disable them. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |

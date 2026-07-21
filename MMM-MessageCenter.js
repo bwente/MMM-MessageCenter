@@ -5,21 +5,36 @@ Module.register("MMM-MessageCenter", {
     ui: "messages",
     pages: true,
     attention: "seymour",
-    messagesPage: 0
-  },
-
-  start() {
-    Log.info("[MMM-MessageCenter] Starting");
-
-    this.currentPage = null;
-    this.messages = [];
-    this.unreadAttentionCount = 0;
-
-    this.sendSocketNotification("MC_START");
+    messagesPage: 4,
+    maxMessages: 50,
+    showToasts: true,
+    clearAttentionWhenViewed: true,
+    webhook: {
+      host: "127.0.0.1",
+      port: 8787,
+      token: ""
+    }
   },
 
   getStyles() {
     return ["MMM-MessageCenter.css"];
+  },
+
+  start() {
+    this.currentPage = null;
+    this.maxPages = null;
+    this.messages = [];
+    this.unreadAttentionCount = 0;
+    this.returnTimer = null;
+
+    this.sendSocketNotification("MC_START", this.config.webhook);
+    this.sendNotification("QUERY_PAGE_NUMBER");
+    Log.info("[MMM-MessageCenter] Started");
+  },
+
+  stop() {
+    this.clearReturnTimer();
+    this.sendSocketNotification("MC_STOP");
   },
 
   getDom() {
@@ -29,38 +44,38 @@ Module.register("MMM-MessageCenter", {
       return hidden;
     }
 
-    const wrapper = document.createElement("div");
+    const wrapper = document.createElement("section");
     wrapper.className = "messages-wrapper";
+    wrapper.setAttribute("aria-label", "Message center");
 
     if (!this.messages.length) {
-      const empty = document.createElement("div");
+      const empty = document.createElement("p");
       empty.className = "messages-empty";
-      empty.innerText = "No messages";
+      empty.textContent = "No messages";
       wrapper.appendChild(empty);
       return wrapper;
     }
 
-    this.messages.forEach((msg) => {
-      const item = document.createElement("div");
-      item.className = "message-item";
-      if (msg.unread) item.classList.add("unread");
+    this.messages.forEach((message) => {
+      const item = document.createElement("article");
+      item.className = `message-item${message.unread ? " unread" : ""}`;
 
-      const title = document.createElement("div");
+      const title = document.createElement("h3");
       title.className = "message-title";
-      title.innerText = msg.title;
-
-      const body = document.createElement("div");
-      body.className = "message-body";
-      body.innerText = msg.body;
-
-      const meta = document.createElement("div");
-      meta.className = "message-meta";
-      meta.innerText = new Date(msg.timestamp).toLocaleTimeString();
-
+      title.textContent = message.title;
       item.appendChild(title);
-      item.appendChild(body);
-      item.appendChild(meta);
 
+      if (message.body) {
+        const body = document.createElement("p");
+        body.className = "message-body";
+        body.textContent = message.body;
+        item.appendChild(body);
+      }
+
+      const meta = document.createElement("p");
+      meta.className = "message-meta";
+      meta.textContent = `${message.source} · ${new Date(message.timestamp).toLocaleString()}`;
+      item.appendChild(meta);
       wrapper.appendChild(item);
     });
 
@@ -68,100 +83,136 @@ Module.register("MMM-MessageCenter", {
   },
 
   notificationReceived(notification, payload) {
-    if (notification === "NEW_PAGE") {
-      this.currentPage = payload;
+    if (notification === "MAX_PAGES_CHANGED") {
+      if (Number.isInteger(payload) && payload >= 0) this.maxPages = payload;
+      return;
+    }
 
+    if (notification === "NEW_PAGE" || notification === "PAGE_NUMBER_IS") {
+      if (!Number.isInteger(payload) || payload < 0) return;
+
+      this.currentPage = payload;
       if (
         payload === this.config.messagesPage &&
+        this.config.clearAttentionWhenViewed &&
         this.unreadAttentionCount > 0
       ) {
         this.clearAttention();
       }
+      return;
     }
 
-    if (notification === "MC_ACK_ALL") {
-      this.clearAttention();
-    }
+    if (notification === "MC_ACK_ALL") this.clearAttention();
+    if (notification === "MC_CLEAR_ALL") this.clearMessages();
   },
 
   socketNotificationReceived(notification, payload) {
+    if (notification === "MC_ERROR") {
+      Log.error(`[MMM-MessageCenter] ${payload}`);
+      return;
+    }
+
     if (notification !== "MC_MESSAGE") return;
 
-    const msg = this.normalizeMessage(payload);
-
-    Log.log("[MMM-MessageCenter] Message received:", msg.title);
-
-    // Store message
-    this.messages.unshift(msg);
-
-    // Toast
-    this.sendNotification("SHOW_ALERT", {
-      type: "notification",
-      title: msg.title,
-      message: msg.body,
-      timer: msg.priority === "attention" ? 6000 : 4000
-    });
-
-    // Page switching
-    if (
-      this.config.pages &&
-      msg.actions &&
-      msg.actions.switchChannel !== undefined
-    ) {
-      const targetPage = Number(msg.actions.switchChannel);
-      const returnPage = this.currentPage;
-
-      if (Number.isFinite(targetPage)) {
-        this.sendNotification("PAGE_CHANGED", targetPage);
-
-        if (msg.actions.timeout && returnPage !== null) {
-          setTimeout(() => {
-            this.sendNotification("PAGE_CHANGED", returnPage);
-            this.clearAttention();
-          }, msg.actions.timeout);
-        }
-      }
+    const message = this.normalizeMessage(payload);
+    if (!message) {
+      Log.warn("[MMM-MessageCenter] Ignored invalid or expired message");
+      return;
     }
 
-    // Attention handling
-    if (msg.priority === "attention") {
+    this.messages.unshift(message);
+    this.messages = this.messages.slice(0, this.getMaxMessages());
+
+    if (message.priority === "attention") {
       this.unreadAttentionCount += 1;
-
       if (this.config.attention === "seymour") {
-        this.sendNotification("ATTENTION_ON");
+        this.sendNotification("ATTENTION_ON", this.unreadAttentionCount);
       }
     }
 
-    this.updateDom(300);
+    if (this.config.showToasts) {
+      this.sendNotification("SHOW_ALERT", {
+        type: "notification",
+        title: message.title,
+        message: message.body,
+        timer: message.priority === "attention" ? 6000 : 4000
+      });
+    }
+
+    if (this.config.pages) this.handlePageAction(message.actions);
+    this.updateDom(200);
+  },
+
+  handlePageAction(actions) {
+    if (!actions || !this.isValidPage(actions.switchChannel)) return;
+
+    const returnPage = this.currentPage;
+    this.sendNotification("PAGE_CHANGED", actions.switchChannel);
+
+    if (!Number.isFinite(actions.timeout) || actions.timeout <= 0 || returnPage === null) {
+      return;
+    }
+
+    this.clearReturnTimer();
+    this.returnTimer = setTimeout(() => {
+      this.returnTimer = null;
+      if (this.isValidPage(returnPage)) this.sendNotification("PAGE_CHANGED", returnPage);
+    }, actions.timeout);
+  },
+
+  isValidPage(page) {
+    if (!Number.isInteger(page) || page < 0) return false;
+    return this.maxPages === null || page < this.maxPages;
+  },
+
+  clearReturnTimer() {
+    if (!this.returnTimer) return;
+    clearTimeout(this.returnTimer);
+    this.returnTimer = null;
   },
 
   clearAttention() {
     this.unreadAttentionCount = 0;
-
-    this.messages.forEach((m) => {
-      m.unread = false;
+    this.messages.forEach((message) => {
+      message.unread = false;
     });
+    if (this.config.attention === "seymour") this.sendNotification("ATTENTION_OFF");
+    this.updateDom(200);
+  },
 
-    if (this.config.attention === "seymour") {
-      this.sendNotification("ATTENTION_OFF");
-    }
+  clearMessages() {
+    this.messages = [];
+    this.clearAttention();
+  },
 
-    this.updateDom(300);
+  getMaxMessages() {
+    return Number.isInteger(this.config.maxMessages) && this.config.maxMessages > 0
+      ? this.config.maxMessages
+      : this.defaults.maxMessages;
   },
 
   normalizeMessage(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+
     const now = Date.now();
+    const timestamp = Number.isFinite(raw.timestamp) ? raw.timestamp : now;
+    const expires = Number.isFinite(raw.expires) ? raw.expires : null;
+    if (expires !== null && expires <= now) return null;
+
+    const priority = raw.priority === "attention" ? "attention" : "ephemeral";
+    const actions = raw.actions && typeof raw.actions === "object" ? raw.actions : {};
 
     return {
-      id: raw.id || `${now}`,
-      type: raw.type || "generic",
-      source: raw.source || "unknown",
-      title: raw.title || "Message",
-      body: raw.body || "",
-      priority: raw.priority || "ephemeral",
-      timestamp: raw.timestamp || now,
-      unread: raw.priority === "attention",
-      actions: raw.actions || {}
+      id: String(raw.id || `${now}`),
+      type: String(raw.type || "generic"),
+      source: String(raw.source || "unknown"),
+      title: String(raw.title || "Message"),
+      body: String(raw.body || ""),
+      priority,
+      timestamp,
+      unread: priority === "attention",
+      expires,
+      actions
     };
   }
 });
