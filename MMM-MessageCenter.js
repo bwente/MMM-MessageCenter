@@ -7,6 +7,7 @@ Module.register("MMM-MessageCenter", {
     attention: "seymour",
     messagesPage: 4,
     maxMessages: 50,
+    showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
     webhook: {
@@ -26,6 +27,7 @@ Module.register("MMM-MessageCenter", {
     this.messages = [];
     this.unreadAttentionCount = 0;
     this.returnTimer = null;
+    this.autoNavigation = null;
 
     this.sendSocketNotification("MC_START", this.config.webhook);
     this.sendNotification("QUERY_PAGE_NUMBER");
@@ -33,7 +35,7 @@ Module.register("MMM-MessageCenter", {
   },
 
   stop() {
-    this.clearReturnTimer();
+    this.cancelAutoNavigation();
     this.sendSocketNotification("MC_STOP");
   },
 
@@ -47,23 +49,50 @@ Module.register("MMM-MessageCenter", {
     const wrapper = document.createElement("section");
     wrapper.className = "messages-wrapper";
     wrapper.setAttribute("aria-label", "Message center");
+    wrapper.setAttribute("aria-live", "polite");
+
+    if (this.config.showHeader) {
+      wrapper.appendChild(this.getHeaderDom());
+    }
 
     if (!this.messages.length) {
-      const empty = document.createElement("p");
+      const empty = document.createElement("div");
       empty.className = "messages-empty";
-      empty.textContent = "No messages";
+
+      const emptyTitle = document.createElement("p");
+      emptyTitle.className = "messages-empty-title";
+      emptyTitle.textContent = "You’re all caught up";
+      empty.appendChild(emptyTitle);
+
+      const emptyDetail = document.createElement("p");
+      emptyDetail.className = "messages-empty-detail";
+      emptyDetail.textContent = "New household messages will appear here.";
+      empty.appendChild(emptyDetail);
+
       wrapper.appendChild(empty);
       return wrapper;
     }
 
     this.messages.forEach((message) => {
       const item = document.createElement("article");
-      item.className = `message-item${message.unread ? " unread" : ""}`;
+      item.className = `message-item message-${message.priority}${message.unread ? " unread" : ""}`;
+
+      const heading = document.createElement("div");
+      heading.className = "message-heading";
 
       const title = document.createElement("h3");
       title.className = "message-title";
       title.textContent = message.title;
-      item.appendChild(title);
+      heading.appendChild(title);
+
+      if (message.unread) {
+        const unread = document.createElement("span");
+        unread.className = "message-unread-indicator";
+        unread.textContent = "New";
+        heading.appendChild(unread);
+      }
+
+      item.appendChild(heading);
 
       if (message.body) {
         const body = document.createElement("p");
@@ -72,14 +101,57 @@ Module.register("MMM-MessageCenter", {
         item.appendChild(body);
       }
 
-      const meta = document.createElement("p");
+      const meta = document.createElement("div");
       meta.className = "message-meta";
-      meta.textContent = `${message.source} · ${new Date(message.timestamp).toLocaleString()}`;
+
+      const source = document.createElement("span");
+      source.className = "message-source";
+      source.textContent = message.source;
+      meta.appendChild(source);
+
+      const timestamp = document.createElement("time");
+      const date = new Date(message.timestamp);
+      timestamp.className = "message-time";
+      timestamp.dateTime = date.toISOString();
+      timestamp.textContent = date.toLocaleString();
+      meta.appendChild(timestamp);
+
       item.appendChild(meta);
       wrapper.appendChild(item);
     });
 
     return wrapper;
+  },
+
+  getHeaderDom() {
+    const header = document.createElement("header");
+    header.className = "messages-header";
+
+    const heading = document.createElement("div");
+    heading.className = "messages-heading";
+
+    const title = document.createElement("h2");
+    title.className = "messages-title";
+    title.textContent = "Messages";
+    heading.appendChild(title);
+
+    const count = document.createElement("span");
+    count.className = "messages-count";
+    count.textContent = String(this.messages.length);
+    count.setAttribute("aria-label", `${this.messages.length} messages`);
+    heading.appendChild(count);
+    header.appendChild(heading);
+
+    if (this.unreadAttentionCount > 0) {
+      const acknowledge = document.createElement("button");
+      acknowledge.className = "messages-acknowledge";
+      acknowledge.type = "button";
+      acknowledge.textContent = "Mark all read";
+      acknowledge.addEventListener("click", () => this.clearAttention());
+      header.appendChild(acknowledge);
+    }
+
+    return header;
   },
 
   notificationReceived(notification, payload) {
@@ -92,6 +164,9 @@ Module.register("MMM-MessageCenter", {
       if (!Number.isInteger(payload) || payload < 0) return;
 
       this.currentPage = payload;
+      if (this.autoNavigation && payload !== this.autoNavigation.targetPage) {
+        this.cancelAutoNavigation();
+      }
       if (
         payload === this.config.messagesPage &&
         this.config.clearAttentionWhenViewed &&
@@ -120,13 +195,16 @@ Module.register("MMM-MessageCenter", {
       return;
     }
 
+    const previousUnreadCount = this.unreadAttentionCount;
     this.messages.unshift(message);
     this.messages = this.messages.slice(0, this.getMaxMessages());
+    this.unreadAttentionCount = this.messages.filter((stored) => stored.unread).length;
 
-    if (message.priority === "attention") {
-      this.unreadAttentionCount += 1;
-      if (this.config.attention === "seymour") {
+    if (this.config.attention === "seymour") {
+      if (this.unreadAttentionCount > 0 && message.priority === "attention") {
         this.sendNotification("ATTENTION_ON", this.unreadAttentionCount);
+      } else if (previousUnreadCount > 0 && this.unreadAttentionCount === 0) {
+        this.sendNotification("ATTENTION_OFF");
       }
     }
 
@@ -146,18 +224,38 @@ Module.register("MMM-MessageCenter", {
   handlePageAction(actions) {
     if (!actions || !this.isValidPage(actions.switchChannel)) return;
 
-    const returnPage = this.currentPage;
+    const hasTimedReturn = Number.isFinite(actions.timeout) && actions.timeout > 0;
+    const returnPage = this.autoNavigation
+      ? this.autoNavigation.returnPage
+      : this.currentPage;
+
     this.clearReturnTimer();
+    this.autoNavigation = hasTimedReturn
+      ? { targetPage: actions.switchChannel, returnPage }
+      : null;
     this.sendNotification("PAGE_CHANGED", actions.switchChannel);
 
-    if (!Number.isFinite(actions.timeout) || actions.timeout <= 0 || returnPage === null) {
+    if (!hasTimedReturn || returnPage === null || returnPage === actions.switchChannel) {
       return;
     }
 
     this.returnTimer = setTimeout(() => {
       this.returnTimer = null;
-      if (this.isValidPage(returnPage)) this.sendNotification("PAGE_CHANGED", returnPage);
+      const navigation = this.autoNavigation;
+      this.autoNavigation = null;
+      if (
+        navigation &&
+        this.currentPage === navigation.targetPage &&
+        this.isValidPage(navigation.returnPage)
+      ) {
+        this.sendNotification("PAGE_CHANGED", navigation.returnPage);
+      }
     }, actions.timeout);
+  },
+
+  cancelAutoNavigation() {
+    this.clearReturnTimer();
+    this.autoNavigation = null;
   },
 
   isValidPage(page) {
@@ -185,7 +283,7 @@ Module.register("MMM-MessageCenter", {
   },
 
   clearMessages() {
-    this.clearReturnTimer();
+    this.cancelAutoNavigation();
     this.messages = [];
     this.clearAttention();
   },
@@ -200,7 +298,10 @@ Module.register("MMM-MessageCenter", {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
 
     const now = Date.now();
-    const timestamp = Number.isFinite(raw.timestamp) ? raw.timestamp : now;
+    const candidateTimestamp = Number.isFinite(raw.timestamp) ? raw.timestamp : now;
+    const timestamp = Number.isNaN(new Date(candidateTimestamp).getTime())
+      ? now
+      : candidateTimestamp;
     const expires = Number.isFinite(raw.expires) ? raw.expires : null;
     if (expires !== null && expires <= now) return null;
 

@@ -29,6 +29,7 @@ npm install --omit=dev
     attention: "seymour",
     messagesPage: 4,
     maxMessages: 50,
+    showHeader: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
     webhook: {
@@ -64,6 +65,7 @@ Place the module class on the corresponding MMM-pages page:
 | `attention` | string | `"seymour"` | Emit Seymour attention notifications; use another value to disable them. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
+| `showHeader` | boolean | `true` | Show the inbox title, count, and touch-friendly acknowledgement control. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
 | `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. |
@@ -114,11 +116,21 @@ Do not expose this webhook directly to the public internet.
 | `actions.switchChannel` | integer | Optional MMM-pages target index. |
 | `actions.timeout` | number | Optional milliseconds before returning. |
 
+A timed page action returns only while MessageCenter still owns the automatic
+navigation. Turning the encoder, touching another channel, or otherwise changing
+pages cancels the pending return so an alert cannot fight the user. Consecutive
+timed alerts preserve the page that was visible before the first alert.
+
 ## Notifications
 
 MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
 `ATTENTION_OFF` when attention is cleared. Other modules may send `MC_ACK_ALL`
 to mark messages read or `MC_CLEAR_ALL` to empty the inbox.
+
+These are ordinary MagicMirror notifications; MessageCenter does not control
+WLED or depend on a particular lighting implementation. MMM-Seymour may consume
+them as one attention source alongside Home Assistant, calendar, or other
+modules.
 
 ## Development
 
