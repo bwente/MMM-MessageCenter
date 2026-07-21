@@ -6,6 +6,7 @@ Module.register("MMM-MessageCenter", {
     pages: true,
     attention: "seymour",
     messagesPage: 4,
+    channelRoutes: {},
     maxMessages: 50,
     expirationSweepInterval: 60000,
     publishAttentionState: true,
@@ -173,11 +174,11 @@ Module.register("MMM-MessageCenter", {
         this.cancelAutoNavigation();
       }
       if (
-        payload === this.config.messagesPage &&
+        payload === this.resolvePageTarget("messages") &&
         this.config.clearAttentionWhenViewed &&
         this.unreadAttentionCount > 0
       ) {
-        this.clearAttention();
+        this.markViewed();
       }
       return;
     }
@@ -201,6 +202,7 @@ Module.register("MMM-MessageCenter", {
     }
 
     const previousAttentionState = this.getAttentionState();
+    let inboxChanged = false;
     const duplicateIndex = message.hasExplicitId
       ? this.messages.findIndex(
           (stored) =>
@@ -216,18 +218,26 @@ Module.register("MMM-MessageCenter", {
         return;
       }
       this.messages.splice(duplicateIndex, 1);
+      inboxChanged = true;
     }
 
-    this.messages.unshift(message);
-    this.messages = this.messages.slice(0, this.getMaxMessages());
-    this.publishAttention(previousAttentionState);
+    if (message.retention !== "ephemeral") {
+      this.messages.unshift(message);
+      this.messages = this.messages.slice(0, this.getMaxMessages());
+      inboxChanged = true;
+    }
+    if (inboxChanged) this.publishAttention(previousAttentionState);
 
     if (this.config.showToasts) {
       this.sendNotification("SHOW_ALERT", {
         type: "notification",
         title: message.title,
         message: message.body,
-        timer: message.priority === "attention" ? 6000 : 4000
+        timer: message.urgency === "critical"
+          ? 8000
+          : message.urgency === "attention"
+            ? 6000
+            : 4000
       });
     }
 
@@ -236,7 +246,9 @@ Module.register("MMM-MessageCenter", {
   },
 
   handlePageAction(actions) {
-    if (!actions || !this.isValidPage(actions.switchChannel)) return;
+    if (!actions) return;
+    const targetPage = this.resolvePageTarget(actions.switchChannel);
+    if (!this.isValidPage(targetPage)) return;
 
     const hasTimedReturn = Number.isFinite(actions.timeout) && actions.timeout > 0;
     const returnPage = this.autoNavigation
@@ -245,11 +257,11 @@ Module.register("MMM-MessageCenter", {
 
     this.clearReturnTimer();
     this.autoNavigation = hasTimedReturn
-      ? { targetPage: actions.switchChannel, returnPage }
+      ? { targetPage, returnPage }
       : null;
-    this.sendNotification("PAGE_CHANGED", actions.switchChannel);
+    this.sendNotification("PAGE_CHANGED", targetPage);
 
-    if (!hasTimedReturn || returnPage === null || returnPage === actions.switchChannel) {
+    if (!hasTimedReturn || returnPage === null || returnPage === targetPage) {
       return;
     }
 
@@ -279,6 +291,20 @@ Module.register("MMM-MessageCenter", {
       page >= 0 &&
       page < this.maxPages
     );
+  },
+
+  resolvePageTarget(target) {
+    if (Number.isInteger(target)) return target;
+    if (typeof target !== "string" || !target.trim()) return null;
+
+    const name = target.trim();
+    if (name === "messages") return this.config.messagesPage;
+
+    const routes = this.config.channelRoutes;
+    if (!routes || typeof routes !== "object" || Array.isArray(routes)) return null;
+    return Object.prototype.hasOwnProperty.call(routes, name) && Number.isInteger(routes[name])
+      ? routes[name]
+      : null;
   },
 
   clearReturnTimer() {
@@ -320,7 +346,9 @@ Module.register("MMM-MessageCenter", {
   getAttentionState() {
     const unreadMessages = this.messages.filter((message) => message.unread);
     const sources = [...new Set(unreadMessages.map((message) => message.source))];
-    const highestPriority = unreadMessages.some((message) => message.priority === "critical")
+    const highestUrgency = unreadMessages.some(
+      (message) => message.urgency === "critical"
+    )
       ? "critical"
       : unreadMessages.length
         ? "attention"
@@ -329,7 +357,8 @@ Module.register("MMM-MessageCenter", {
     return {
       active: unreadMessages.length > 0,
       unreadCount: unreadMessages.length,
-      highestPriority,
+      highestPriority: highestUrgency,
+      highestUrgency,
       sources
     };
   },
@@ -365,6 +394,15 @@ Module.register("MMM-MessageCenter", {
     this.updateDom(200);
   },
 
+  markViewed() {
+    const previousAttentionState = this.getAttentionState();
+    this.messages.forEach((message) => {
+      if (message.retention !== "untilAcknowledged") message.unread = false;
+    });
+    this.publishAttention(previousAttentionState);
+    this.updateDom(200);
+  },
+
   clearMessages() {
     this.cancelAutoNavigation();
     const previousAttentionState = this.getAttentionState();
@@ -384,7 +422,10 @@ Module.register("MMM-MessageCenter", {
       left.title === right.title &&
       left.body === right.body &&
       left.type === right.type &&
+      left.entityId === right.entityId &&
       left.priority === right.priority &&
+      left.urgency === right.urgency &&
+      left.retention === right.retention &&
       left.expires === right.expires &&
       JSON.stringify(left.actions) === JSON.stringify(right.actions)
     );
@@ -401,7 +442,22 @@ Module.register("MMM-MessageCenter", {
     const expires = Number.isFinite(raw.expires) ? raw.expires : null;
     if (expires !== null && expires <= now) return null;
 
-    const priority = raw.priority === "attention" ? "attention" : "ephemeral";
+    const legacyPriority = raw.priority === "attention" ? "attention" : "ephemeral";
+    const urgencyValues = ["passive", "attention", "critical"];
+    const urgency = urgencyValues.includes(raw.urgency)
+      ? raw.urgency
+      : legacyPriority === "attention"
+        ? "attention"
+        : "passive";
+    const retentionValues = ["ephemeral", "untilViewed", "untilAcknowledged", "archive"];
+    const retention = retentionValues.includes(raw.retention)
+      ? raw.retention
+      : urgency === "critical"
+        ? "untilAcknowledged"
+        : urgency === "attention"
+          ? "untilViewed"
+          : "archive";
+    const priority = urgency === "passive" ? "ephemeral" : "attention";
     const actions = raw.actions && typeof raw.actions === "object" ? raw.actions : {};
 
     const hasExplicitId = raw.id !== undefined && raw.id !== null && raw.id !== "";
@@ -411,11 +467,16 @@ Module.register("MMM-MessageCenter", {
       hasExplicitId,
       type: String(raw.type || "generic"),
       source: String(raw.source || "unknown"),
+      entityId: raw.entityId === undefined || raw.entityId === null || raw.entityId === ""
+        ? null
+        : String(raw.entityId),
       title: String(raw.title || "Message"),
       body: String(raw.body || ""),
       priority,
+      urgency,
+      retention,
       timestamp,
-      unread: priority === "attention",
+      unread: urgency !== "passive" && retention !== "ephemeral",
       expires,
       actions
     };

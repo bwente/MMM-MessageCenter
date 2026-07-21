@@ -88,6 +88,7 @@ Place the module class on the corresponding MMM-pages page:
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
 | `attention` | string | `"seymour"` | Compatibility switch for emitting generic attention notifications; use another value to disable them. This option will become integration-neutral. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
+| `channelRoutes` | object | `{}` | Maps semantic channel names such as `weather` to MMM-pages indexes. The built-in `messages` route always uses `messagesPage`. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
 | `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
 | `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
@@ -109,10 +110,12 @@ curl http://127.0.0.1:8787/message \
   -H "Content-Type: application/json" \
   -d '{
     "source": "home-assistant",
+    "entityId": "garage-door",
     "title": "Garage door open",
     "body": "The garage door has been open for 10 minutes.",
-    "priority": "attention",
-    "actions": { "switchChannel": 4, "timeout": 10000 }
+    "urgency": "attention",
+    "retention": "untilViewed",
+    "actions": { "switchChannel": "messages", "timeout": 10000 }
   }'
 ```
 
@@ -130,21 +133,34 @@ Do not expose this webhook directly to the public internet.
 
 ## Message schema
 
-The current schema is intentionally small. Its priority names blur urgency and
-retention even though the current queue stores both values. The roadmap separates
-those concepts without breaking existing senders.
+The refined contract separates urgency from retention. Existing senders using
+`priority: "attention"` or `priority: "ephemeral"` remain supported.
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | string | Optional sender-provided identifier. |
 | `source` | string | Origin such as `home-assistant`. |
+| `entityId` | string | Optional stable subject such as `dishwasher` or `front-door`. |
+| `type` | string | Semantic event type such as `appliance.complete`. |
 | `title` | string | Message heading. |
 | `body` | string | Message details. |
-| `priority` | string | `ephemeral` or `attention`. |
+| `urgency` | string | `passive`, `attention`, or `critical`. Controls awareness and toast duration. |
+| `retention` | string | `ephemeral`, `untilViewed`, `untilAcknowledged`, or `archive`. Explicit `ephemeral` messages do not enter inbox history. |
+| `priority` | string | Legacy compatibility field: `ephemeral` or `attention`. |
 | `timestamp` | number | Epoch timestamp in milliseconds. |
 | `expires` | number | Optional expiration time in milliseconds. |
-| `actions.switchChannel` | integer | Optional MMM-pages target index. |
+| `actions.switchChannel` | string or integer | Semantic destination or legacy MMM-pages index. `messages` is built in. |
 | `actions.timeout` | number | Optional milliseconds before returning. |
+
+Legacy `priority: "attention"` maps to `urgency: "attention"` and
+`retention: "untilViewed"`. Legacy `priority: "ephemeral"` maps to passive,
+bounded inbox history to preserve the original behavior. New senders should use
+the explicit fields.
+
+Viewing the inbox clears `untilViewed` attention. Messages marked
+`untilAcknowledged` continue requesting attention until the user explicitly
+marks them read. Messages remain in bounded in-memory history until they expire,
+are cleared, or are displaced by `maxMessages`.
 
 A timed page action returns only while MessageCenter still owns the automatic
 navigation. Turning the encoder, touching another channel, or otherwise changing
@@ -158,8 +174,9 @@ MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
 to mark messages read or `MC_CLEAR_ALL` to empty the inbox.
 
 It also emits `MESSAGE_CENTER_ATTENTION_CHANGED` with `active`, `unreadCount`,
-`highestPriority`, and `sources`. The structured event is the preferred contract
-for new integrations; the legacy events remain available for compatibility.
+`highestUrgency`, `highestPriority` (compatibility alias), and `sources`. The
+structured event is the preferred contract for new integrations; the legacy
+events remain available for compatibility.
 
 These are ordinary MagicMirror notifications; MessageCenter does not control
 WLED or depend on a particular lighting implementation. MMM-Seymour may consume

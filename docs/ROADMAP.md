@@ -44,24 +44,26 @@ The implemented message shape is:
   "id": "dishwasher-cycle-1042",
   "type": "appliance.complete",
   "source": "home-assistant",
+  "entityId": "dishwasher",
   "title": "Dishwasher",
   "body": "The dishes are done",
-  "priority": "attention",
+  "urgency": "attention",
+  "retention": "untilViewed",
   "timestamp": 1784608200000,
   "unread": true,
   "expires": null,
   "actions": {
-    "switchChannel": 4,
+    "switchChannel": "messages",
     "timeout": 10000
   }
 }
 ```
 
-Messages are ordered newest first. Current priority values are `ephemeral` and
-`attention`, and both are presently retained in the in-memory queue. Messages
-are lost when MagicMirror restarts.
+Messages are ordered newest first. Urgency and retention are independent, while
+legacy `priority` senders remain compatible. Messages are lost when MagicMirror
+restarts.
 
-## Target lifecycle model
+## Lifecycle model
 
 Urgency and retention are separate concerns and should evolve independently.
 
@@ -69,12 +71,12 @@ Urgency and retention are separate concerns and should evolve independently.
 
 - `passive`: useful information without an attention request;
 - `attention`: requires timely awareness;
-- `critical`: future highest urgency with explicit acknowledgement policy.
+- `critical`: highest urgency with an extended toast and explicit acknowledgement support.
 
 ### Retention
 
 - `ephemeral`: toast or transient display, not retained in the inbox;
-- `untilViewed`: retained until the message page is viewed;
+- `untilViewed`: requests attention until the message page is viewed;
 - `untilAcknowledged`: retained until explicit user acknowledgement;
 - `archive`: retained according to configured history policy.
 
@@ -92,14 +94,15 @@ The current compatibility events are:
 - `ATTENTION_ON`
 - `ATTENTION_OFF`
 
-The target contract also publishes a structured snapshot:
+The contract also publishes a structured snapshot:
 
 ```js
 MESSAGE_CENTER_ATTENTION_CHANGED
 {
   active: true,
   unreadCount: 3,
-  highestPriority: "attention",
+  highestUrgency: "attention",
+  highestPriority: "attention", // compatibility alias
   sources: ["home-assistant", "weather"]
 }
 ```
@@ -110,7 +113,7 @@ events remain during a compatibility period.
 
 ## Page and channel routing
 
-The current action accepts a zero-based MMM-pages index:
+The action still accepts a zero-based MMM-pages index for compatibility:
 
 ```json
 {
@@ -123,8 +126,8 @@ Automatic navigation returns only while MessageCenter still owns the temporary
 page change. Manual encoder, keyboard, or touch navigation cancels the return.
 Consecutive timed alerts preserve the page visible before the first alert.
 
-Numeric indexes are fragile when users reorder pages. The target contract adds
-semantic destinations while retaining numeric compatibility:
+Numeric indexes are fragile when users reorder pages. Semantic destinations are
+resolved through `channelRoutes`; `messages` is a built-in destination:
 
 ```json
 {
@@ -133,7 +136,7 @@ semantic destinations while retaining numeric compatibility:
 }
 ```
 
-A routing adapter resolves the semantic channel to the installed page system.
+The module resolves semantic channels to the installed page indexes.
 
 ## Input providers
 
@@ -183,10 +186,10 @@ producers merely to control hardware.
 - categories and filtering;
 - deduplication by source and message ID;
 - active expiration and message aging;
-- separate urgency and retention fields;
+- separate urgency and retention fields (implemented);
 - individual and bulk acknowledgement;
 - structured attention-state event;
-- semantic channel destinations;
+- semantic channel destinations (implemented);
 - continued physical-device layout and interaction testing.
 
 ### Phase 3 — reliable and rich notifications

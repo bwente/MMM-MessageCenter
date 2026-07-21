@@ -53,7 +53,27 @@ test("normalizes an attention message", () => {
   assert.equal(message.id, "7");
   assert.equal(message.source, "home-assistant");
   assert.equal(message.priority, "attention");
+  assert.equal(message.urgency, "attention");
+  assert.equal(message.retention, "untilViewed");
   assert.equal(message.unread, true);
+});
+
+test("normalizes the refined contract independently of legacy priority", () => {
+  const module = instance();
+  const message = module.normalizeMessage({
+    entityId: "dishwasher",
+    urgency: "critical",
+    retention: "untilAcknowledged"
+  });
+
+  assert.equal(message.entityId, "dishwasher");
+  assert.equal(message.urgency, "critical");
+  assert.equal(message.retention, "untilAcknowledged");
+  assert.equal(message.priority, "attention");
+  assert.equal(message.unread, true);
+
+  const criticalDefault = module.normalizeMessage({ urgency: "critical" });
+  assert.equal(criticalDefault.retention, "untilAcknowledged");
 });
 
 test("rejects invalid and expired messages", () => {
@@ -100,6 +120,40 @@ test("caps stored messages at maxMessages", () => {
     module.messages.map(({ title }) => title),
     ["Three", "Two"]
   );
+});
+
+test("explicit ephemeral messages toast without entering inbox history", () => {
+  const module = instance();
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    title: "Temperature updated",
+    urgency: "passive",
+    retention: "ephemeral"
+  });
+
+  assert.equal(module.messages.length, 0);
+  assert.deepEqual(module.notifications.map(({ name }) => name), ["SHOW_ALERT"]);
+});
+
+test("an ephemeral update removes matching retained attention cleanly", () => {
+  const module = instance({ showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "door",
+    source: "entry",
+    urgency: "attention",
+    retention: "untilViewed"
+  });
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "door",
+    source: "entry",
+    urgency: "passive",
+    retention: "ephemeral"
+  });
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.unreadAttentionCount, 0);
+  assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
 });
 
 test("attention count follows unread messages retained by the inbox", () => {
@@ -210,9 +264,29 @@ test("publishes a structured attention snapshot", () => {
       active: true,
       unreadCount: 1,
       highestPriority: "attention",
+      highestUrgency: "attention",
       sources: ["weather"]
     }
   });
+});
+
+test("viewing messages preserves explicit acknowledgement requirements", () => {
+  const module = instance();
+  module.messages = [
+    { source: "weather", urgency: "critical", retention: "untilAcknowledged", unread: true },
+    { source: "chores", urgency: "attention", retention: "untilViewed", unread: true }
+  ];
+  module.unreadAttentionCount = 2;
+
+  module.markViewed();
+
+  assert.equal(module.messages[0].unread, true);
+  assert.equal(module.messages[1].unread, false);
+  assert.equal(module.unreadAttentionCount, 1);
+
+  module.clearAttention();
+  assert.equal(module.messages[0].unread, false);
+  assert.equal(module.unreadAttentionCount, 0);
 });
 
 test("clears attention when the message page is viewed", () => {
@@ -255,6 +329,25 @@ test("switches to a valid page", () => {
   module.handlePageAction({ switchChannel: 4 });
 
   assert.deepEqual(module.notifications, [{ name: "PAGE_CHANGED", payload: 4 }]);
+});
+
+test("resolves the built-in messages destination", () => {
+  const module = instance({ messagesPage: 0 });
+  module.maxPages = 7;
+
+  module.handlePageAction({ switchChannel: "messages" });
+
+  assert.deepEqual(module.notifications, [{ name: "PAGE_CHANGED", payload: 0 }]);
+});
+
+test("resolves configured semantic channel destinations", () => {
+  const module = instance({ channelRoutes: { weather: 2, cameras: 5 } });
+  module.maxPages = 7;
+
+  module.handlePageAction({ switchChannel: "weather" });
+  module.handlePageAction({ switchChannel: "missing" });
+
+  assert.deepEqual(module.notifications, [{ name: "PAGE_CHANGED", payload: 2 }]);
 });
 
 test("waits for the MMM-pages page count before switching", () => {
