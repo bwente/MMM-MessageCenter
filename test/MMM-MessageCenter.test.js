@@ -126,14 +126,24 @@ test("rejects pages outside the MMM-pages range", () => {
 
 test("switches to a valid page", () => {
   const module = instance();
+  module.maxPages = 7;
 
   module.handlePageAction({ switchChannel: 4 });
 
   assert.deepEqual(module.notifications, [{ name: "PAGE_CHANGED", payload: 4 }]);
 });
 
+test("waits for the MMM-pages page count before switching", () => {
+  const module = instance();
+
+  module.handlePageAction({ switchChannel: 4 });
+
+  assert.equal(module.notifications.length, 0);
+});
+
 test("can disable automatic page actions", () => {
   const module = instance({ pages: false, showToasts: false });
+  module.maxPages = 7;
 
   module.socketNotificationReceived("MC_MESSAGE", {
     title: "No page switch",

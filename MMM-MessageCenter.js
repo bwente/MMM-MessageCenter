@@ -147,13 +147,13 @@ Module.register("MMM-MessageCenter", {
     if (!actions || !this.isValidPage(actions.switchChannel)) return;
 
     const returnPage = this.currentPage;
+    this.clearReturnTimer();
     this.sendNotification("PAGE_CHANGED", actions.switchChannel);
 
     if (!Number.isFinite(actions.timeout) || actions.timeout <= 0 || returnPage === null) {
       return;
     }
 
-    this.clearReturnTimer();
     this.returnTimer = setTimeout(() => {
       this.returnTimer = null;
       if (this.isValidPage(returnPage)) this.sendNotification("PAGE_CHANGED", returnPage);
@@ -161,8 +161,12 @@ Module.register("MMM-MessageCenter", {
   },
 
   isValidPage(page) {
-    if (!Number.isInteger(page) || page < 0) return false;
-    return this.maxPages === null || page < this.maxPages;
+    return (
+      this.maxPages !== null &&
+      Number.isInteger(page) &&
+      page >= 0 &&
+      page < this.maxPages
+    );
   },
 
   clearReturnTimer() {
@@ -181,6 +185,7 @@ Module.register("MMM-MessageCenter", {
   },
 
   clearMessages() {
+    this.clearReturnTimer();
     this.messages = [];
     this.clearAttention();
   },
