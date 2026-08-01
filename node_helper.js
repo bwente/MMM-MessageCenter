@@ -15,7 +15,7 @@ module.exports = NodeHelper.create({
     if (this.server) return;
     if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) rawConfig = {};
 
-    const host = typeof rawConfig.host === "string" ? rawConfig.host : "127.0.0.1";
+    const host = typeof rawConfig.host === "string" ? rawConfig.host : "0.0.0.0";
     const port = Number.isInteger(rawConfig.port) ? rawConfig.port : 8787;
     const token = typeof rawConfig.token === "string" ? rawConfig.token : "";
 
@@ -25,11 +25,10 @@ module.exports = NodeHelper.create({
     }
 
     if (host !== "127.0.0.1" && host !== "localhost" && !token) {
-      this.sendSocketNotification(
-        "MC_ERROR",
-        "A webhook token is required when listening beyond localhost"
+      console.warn(
+        "[MMM-MessageCenter] Webhook is available on the local network without authentication. " +
+        "Configure webhook.token to require bearer authentication; never expose this port to the internet."
       );
-      return;
     }
 
     const app = express();

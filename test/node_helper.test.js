@@ -51,13 +51,31 @@ test("rejects invalid webhook ports", () => {
   assert.match(module.socketNotifications[0].payload, /Invalid webhook port/);
 });
 
-test("requires a token for non-localhost binding", () => {
+test("allows unauthenticated LAN binding with a warning", () => {
   const module = helper();
+  const originalListen = require("express").application.listen;
+  const originalWarn = console.warn;
+  let listened;
+  let warning;
 
-  module.startWebhook({ host: "0.0.0.0", port: 8787, token: "" });
+  require("express").application.listen = function listen(port, host, callback) {
+    listened = { port, host };
+    if (callback) callback();
+    return { on() {}, close() {} };
+  };
+  console.warn = (message) => {
+    warning = message;
+  };
 
-  assert.equal(module.server, null);
-  assert.match(module.socketNotifications[0].payload, /token is required/);
+  try {
+    module.startWebhook({ host: "0.0.0.0", port: 8787, token: "" });
+  } finally {
+    require("express").application.listen = originalListen;
+    console.warn = originalWarn;
+  }
+
+  assert.deepEqual(listened, { port: 8787, host: "0.0.0.0" });
+  assert.match(warning, /without authentication/);
 });
 
 test("invalid startup configuration falls back safely", () => {
@@ -77,5 +95,5 @@ test("invalid startup configuration falls back safely", () => {
     require("express").application.listen = originalListen;
   }
 
-  assert.deepEqual(listened, { port: 8787, host: "127.0.0.1" });
+  assert.deepEqual(listened, { port: 8787, host: "0.0.0.0" });
 });

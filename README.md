@@ -48,7 +48,7 @@ npm install --omit=dev
   config: {
     ui: "messages",
     pages: true,
-    attention: "seymour",
+    legacyAttentionEvents: true,
     messagesPage: 4,
     channelRoutes: {
       weather: 1
@@ -60,12 +60,15 @@ npm install --omit=dev
     showToasts: true,
     clearAttentionWhenViewed: true,
     internalNotifications: {
+      remoteControl: {
+        enabled: true
+      },
       weather: {
         enabled: true
       }
     },
     webhook: {
-      host: "127.0.0.1",
+      host: "0.0.0.0",
       port: 8787,
       token: ""
     }
@@ -94,7 +97,7 @@ Place the module class on the corresponding MMM-pages page:
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
-| `attention` | string | `"seymour"` | Compatibility switch for emitting generic attention notifications; use another value to disable them. This option will become integration-neutral. |
+| `legacyAttentionEvents` | boolean | `true` | Emit compatibility `ATTENTION_ON` and `ATTENTION_OFF` notifications. Structured attention state remains the preferred contract. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `channelRoutes` | object | `{}` | Maps semantic channel names such as `weather` to MMM-pages indexes. The built-in `messages` route always uses `messagesPage`. |
 | `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
@@ -104,18 +107,83 @@ Place the module class on the corresponding MMM-pages page:
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
 | `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |
+| `internalNotifications.remoteControl.enabled` | boolean | `true` | Capture the calm default allowlist of user-facing MMM-Remote-Control notifications. |
+| `internalNotifications.remoteControl.mappings` | object | See below | Explicit allowlist and normalization policy for notifications emitted by MMM-Remote-Control. |
 | `internalNotifications.weather.enabled` | boolean | `false` | Convert eligible default-weather forecasts into MessageCenter alerts. |
-| `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. |
+| `webhook.host` | string | `"0.0.0.0"` | Address on which the webhook listens. The default accepts devices on the local network. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
-| `webhook.token` | string | `""` | Bearer token required for non-localhost listening. |
+| `webhook.token` | string | `""` | Optional bearer token. When configured, every webhook request must provide it. |
 
 Messages are stored only in memory and reset when MagicMirror restarts.
+Inbox timestamps and newly generated weather-alert times follow MagicMirror's
+global `timeFormat` (`12` or `24`) and `locale`/`language` preferences. Changing
+those preferences reformats rendered metadata; it does not rewrite historical
+message body text that was generated earlier.
+
+The inbox is background-agnostic and leaves its sticky header transparent by
+default. Themes that need an opaque header while scrolling can set the
+`--message-center-header-background` CSS custom property to the page background
+color in `custom.css`.
 
 ## MagicMirror internal notifications
 
 MessageCenter can consume MagicMirror's internal module broadcasts directly.
 This keeps the notification experience useful without Home Assistant and lets
 existing modules remain the authoritative data providers.
+
+### MMM-Remote-Control
+
+MMM-Remote-Control rebroadcasts remote `SHOW_ALERT` requests and can intentionally
+forward any MagicMirror notification through its `NOTIFICATION` action.
+MessageCenter uses an explicit allowlist rather than treating Remote Control's
+operational traffic as household messages.
+
+The defaults are:
+
+```js
+internalNotifications: {
+  remoteControl: {
+    enabled: true,
+    mappings: {
+      MC_MESSAGE: { mode: "message" },
+      SHOW_ALERT: {
+        mode: "alert",
+        type: "remote.alert",
+        source: "magicmirror.remote-control",
+        urgency: "passive",
+        retention: "archive"
+      }
+    }
+  }
+}
+```
+
+`SHOW_ALERT` is retained as passive history but does not create another toast,
+because MagicMirror's alert module already receives the original alert.
+An intentionally forwarded `MC_MESSAGE` payload enters the normal MessageCenter
+schema and may request retention, attention, and routing:
+
+```json
+{
+  "action": "NOTIFICATION",
+  "notification": "MC_MESSAGE",
+  "payload": {
+    "id": "entry-reminder",
+    "source": "remote-control",
+    "type": "household.reminder",
+    "title": "Front door",
+    "body": "Please check the front door.",
+    "urgency": "attention",
+    "retention": "untilViewed"
+  }
+}
+```
+
+`REMOTE_ACTION`, `REGISTER_API`, presence, brightness, temperature, refresh,
+module visibility, page navigation, and MessageCenter's own emitted events are
+not captured. Replace `mappings` with a deliberately chosen mapping object to
+change the allowlist; use `{}` to capture nothing while leaving the provider
+available.
 
 ### Rain approaching
 
@@ -174,7 +242,7 @@ It is an optional provider rather than a runtime requirement.
 The webhook accepts a JSON object at `POST /message`:
 
 ```sh
-curl http://127.0.0.1:8787/message \
+curl http://MIRROR_ADDRESS:8787/message \
   -H "Content-Type: application/json" \
   -d '{
     "source": "home-assistant",
@@ -187,8 +255,12 @@ curl http://127.0.0.1:8787/message \
   }'
 ```
 
-To receive requests from another device, bind to a LAN address such as
-`"0.0.0.0"` and configure a strong token. Then include it with every request:
+The default configuration accepts requests from the local network without
+authentication for straightforward onboarding. Do not expose the webhook port
+directly to the public internet.
+
+For permanent or less-trusted network installations, configure a strong token
+and include it with every request:
 
 ```sh
 curl http://MIRROR_IP:8787/message \
@@ -197,7 +269,9 @@ curl http://MIRROR_IP:8787/message \
   -d '{"title":"Test message"}'
 ```
 
-Do not expose this webhook directly to the public internet.
+When `webhook.token` is empty, MessageCenter logs a warning at startup. Set
+`webhook.host` to `"127.0.0.1"` when only software running on the mirror should
+be able to submit messages.
 
 ## Message schema
 
@@ -225,7 +299,8 @@ Legacy `priority: "attention"` maps to `urgency: "attention"` and
 bounded inbox history to preserve the original behavior. New senders should use
 the explicit fields.
 
-Viewing the inbox clears `untilViewed` attention. Messages marked
+After the inbox first renders, it clears `untilViewed` attention and transitions
+from the unread styling to the read urgency edge. Messages marked
 `untilAcknowledged` continue requesting attention until the user explicitly
 marks them read. Messages remain in bounded in-memory history until they expire,
 are cleared, or are displaced by `maxMessages`.
@@ -257,6 +332,10 @@ WLED or depend on a particular lighting implementation. MMM-Seymour may consume
 them as one attention source alongside Home Assistant, calendar, or other
 modules.
 
+The former `attention: "seymour"` setting remains supported for existing
+installations. New configurations should use the integration-neutral
+`legacyAttentionEvents` option.
+
 Potential senders include Home Assistant, calendars, cameras, doorbells,
 weather services, household appliances, custom webhooks, and other MagicMirror
 modules. All senders should normalize into the same message contract rather than
@@ -274,5 +353,4 @@ events.
 
 ## License
 
-No license has been selected yet. Until one is added, the source is not granted
-for reuse or redistribution.
+MMM-MessageCenter is available under the [MIT License](LICENSE).

@@ -28,6 +28,7 @@ function instance(config = {}) {
     returnTimer: null,
     autoNavigation: null,
     expirationTimer: null,
+    pendingView: null,
     notifications,
     updateDom() {},
     sendNotification(name, payload) {
@@ -35,6 +36,18 @@ function instance(config = {}) {
     },
     sendSocketNotification() {}
   };
+}
+
+function withGlobalConfig(value, callback) {
+  const hadConfig = Object.prototype.hasOwnProperty.call(global, "config");
+  const previous = global.config;
+  global.config = value;
+  try {
+    return callback();
+  } finally {
+    if (hadConfig) global.config = previous;
+    else delete global.config;
+  }
 }
 
 test("defaults the message center to page four", () => {
@@ -215,8 +228,81 @@ test("presents friendly labels for known internal sources", () => {
   const module = instance();
 
   assert.equal(module.getMessageSourceLabel("magicmirror.weather"), "Weather");
+  assert.equal(module.getMessageSourceLabel("magicmirror.remote-control"), "Remote Control");
   assert.equal(module.getMessageSourceLabel("home-assistant"), "Home Assistant");
+  assert.equal(
+    module.getMessageSourceLabel("home-assistant.smartthings"),
+    "SmartThings via Home Assistant"
+  );
   assert.equal(module.getMessageSourceLabel("custom-source"), "custom-source");
+});
+
+test("formats timestamps using MagicMirror 12-hour preferences", () => {
+  const module = instance();
+  const date = new Date(2026, 6, 23, 14, 5, 6);
+
+  withGlobalConfig({ timeFormat: 12, locale: "en-US" }, () => {
+    assert.match(module.formatMessageTimestamp(date), /2:05:06\s*PM/i);
+    assert.match(module.formatClockTime(date), /2:05\s*PM/i);
+  });
+});
+
+test("formats timestamps using MagicMirror 24-hour preferences", () => {
+  const module = instance();
+  const date = new Date(2026, 6, 23, 14, 5, 6);
+
+  withGlobalConfig({ timeFormat: 24, locale: "en-US" }, () => {
+    assert.match(module.formatMessageTimestamp(date), /14:05:06/);
+    assert.match(module.formatClockTime(date), /14:05/);
+    assert.doesNotMatch(module.formatClockTime(date), /AM|PM/i);
+  });
+});
+
+test("prefers MagicMirror locale and falls back to language", () => {
+  const module = instance();
+  const date = new Date(2026, 6, 23, 14, 5, 6);
+
+  withGlobalConfig({ timeFormat: 24, locale: "en-GB", language: "en-US" }, () => {
+    assert.match(module.formatMessageTimestamp(date), /^23\/07\/2026/);
+  });
+  withGlobalConfig({ timeFormat: 24, locale: "", language: "en-US" }, () => {
+    assert.match(module.formatMessageTimestamp(date), /^7\/23\/2026/);
+  });
+});
+
+test("falls back safely when global date and time preferences are invalid", () => {
+  const module = instance();
+  const date = new Date(2026, 6, 23, 14, 5, 6);
+
+  withGlobalConfig({ timeFormat: "twelve", locale: "not_a_locale" }, () => {
+    assert.ok(module.formatMessageTimestamp(date).length > 0);
+    assert.ok(module.formatClockTime(date).length > 0);
+  });
+  withGlobalConfig(undefined, () => {
+    assert.ok(module.formatMessageTimestamp(date).length > 0);
+  });
+  assert.equal(module.formatMessageTimestamp("not-a-date"), "");
+});
+
+test("reformats metadata without rewriting a stored message body", () => {
+  const module = instance();
+  const message = {
+    body: "Rain is expected around 15:00.",
+    timestamp: new Date(2026, 6, 23, 14, 5, 6).getTime()
+  };
+
+  const twelveHourMetadata = withGlobalConfig(
+    { timeFormat: 12, locale: "en-US" },
+    () => module.formatMessageTimestamp(message.timestamp)
+  );
+  const twentyFourHourMetadata = withGlobalConfig(
+    { timeFormat: 24, locale: "en-US" },
+    () => module.formatMessageTimestamp(message.timestamp)
+  );
+
+  assert.match(twelveHourMetadata, /2:05:06\s*PM/i);
+  assert.match(twentyFourHourMetadata, /14:05:06/);
+  assert.equal(message.body, "Rain is expected around 15:00.");
 });
 
 test("ignores an equivalent webhook retry without repeating its toast", () => {
@@ -299,6 +385,33 @@ test("turns a provider-neutral hourly rain forecast into a message", () => {
     ),
     true
   );
+});
+
+test("uses MagicMirror clock preferences in newly generated weather text", () => {
+  const future = new Date();
+  future.setDate(future.getDate() + 1);
+  future.setHours(14, 0, 0, 0);
+  const now = future.getTime();
+  const hourlyArray = [
+    {
+      date: now + 60 * 60000,
+      weatherType: "rain",
+      precipitationProbability: 70
+    }
+  ];
+  const twelveHourModule = weatherInstance();
+  const twentyFourHourModule = weatherInstance();
+
+  withGlobalConfig({ timeFormat: 12, locale: "en-US" }, () => {
+    twelveHourModule.handleWeatherUpdated({ hourlyArray }, now);
+  });
+  withGlobalConfig({ timeFormat: 24, locale: "en-US" }, () => {
+    twentyFourHourModule.handleWeatherUpdated({ hourlyArray }, now);
+  });
+
+  assert.match(twelveHourModule.messages[0].body, /around 3:00\s*PM\./i);
+  assert.match(twentyFourHourModule.messages[0].body, /around 15:00\./);
+  assert.doesNotMatch(twentyFourHourModule.messages[0].body, /AM|PM/i);
 });
 
 test("receives weather through the normal MagicMirror notification path", () => {
@@ -446,6 +559,141 @@ test("can disable all internal MagicMirror notification providers", () => {
   assert.equal(module.messages.length, 0);
 });
 
+test("captures a Remote Control alert without repeating its toast", () => {
+  const module = instance();
+
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { title: "Delivery", message: "A package is at the door." },
+    { name: "MMM-Remote-Control" }
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].type, "remote.alert");
+  assert.equal(module.messages[0].source, "magicmirror.remote-control");
+  assert.equal(module.messages[0].title, "Delivery");
+  assert.equal(module.messages[0].body, "A package is at the door.");
+  assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+});
+
+test("accepts an intentionally forwarded Remote Control message", () => {
+  const module = instance();
+
+  module.notificationReceived(
+    "MC_MESSAGE",
+    {
+      id: "door-open",
+      source: "entry-system",
+      title: "Front door",
+      body: "The front door is open.",
+      urgency: "attention",
+      retention: "untilViewed"
+    },
+    { name: "MMM-Remote-Control" }
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].id, "door-open");
+  assert.equal(module.messages[0].source, "entry-system");
+  assert.equal(module.messages[0].unread, true);
+  assert.equal(module.notifications.filter(({ name }) => name === "SHOW_ALERT").length, 1);
+});
+
+test("recognizes Remote Control through sender module data", () => {
+  const module = instance();
+
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { title: "Reminder", message: "Check the mailbox." },
+    { data: { module: "MMM-Remote-Control" } }
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].source, "magicmirror.remote-control");
+});
+
+test("rejects an expired message forwarded by Remote Control", () => {
+  const module = instance();
+
+  module.notificationReceived(
+    "MC_MESSAGE",
+    {
+      title: "Old reminder",
+      expires: Date.now() - 1
+    },
+    { name: "MMM-Remote-Control" }
+  );
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.notifications.length, 0);
+});
+
+test("ignores Remote Control operational notifications", () => {
+  const module = instance();
+  const sender = { name: "MMM-Remote-Control" };
+
+  for (const [notification, payload] of [
+    ["REMOTE_ACTION", { action: "BRIGHTNESS", value: 80 }],
+    ["REGISTER_API", { action: "pages" }],
+    ["USER_PRESENCE", true],
+    ["PAGE_CHANGED", 2],
+    ["REFRESH", undefined],
+    ["SHOW", { module: "clock" }]
+  ]) {
+    module.notificationReceived(notification, payload, sender);
+  }
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.notifications.length, 0);
+});
+
+test("ignores malformed Remote Control message payloads", () => {
+  const module = instance();
+  const sender = { name: "MMM-Remote-Control" };
+
+  module.notificationReceived("MC_MESSAGE", "not-an-object", sender);
+  module.notificationReceived("SHOW_ALERT", {}, sender);
+  module.notificationReceived("SHOW_ALERT", [], sender);
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.notifications.length, 0);
+});
+
+test("does not ingest MessageCenter notifications as Remote Control messages", () => {
+  const module = instance();
+
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { title: "MessageCenter toast", message: "Do not capture this." },
+    { name: "MMM-MessageCenter" }
+  );
+  module.notificationReceived(
+    "MESSAGE_CENTER_ATTENTION_CHANGED",
+    { active: true },
+    { name: "MMM-Remote-Control" }
+  );
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("allows Remote Control notification mappings to be disabled", () => {
+  const module = instance({
+    internalNotifications: {
+      remoteControl: {
+        enabled: false
+      }
+    }
+  });
+
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { title: "Ignored", message: "Disabled provider" },
+    { name: "MMM-Remote-Control" }
+  );
+
+  assert.equal(module.messages.length, 0);
+});
+
 test("prunes expired messages and publishes cleared attention state", () => {
   const module = instance({ showToasts: false });
   const now = Date.now();
@@ -519,17 +767,46 @@ test("viewing messages preserves explicit acknowledgement requirements", () => {
   assert.equal(module.unreadAttentionCount, 0);
 });
 
-test("clears attention when the message page is viewed", () => {
+test("clears attention after the message page first renders", async () => {
   const module = instance();
-  module.messages = [{ unread: true }];
+  let renders = 0;
+  module.updateDom = () => {
+    renders += 1;
+  };
+  module.messages = [
+    { source: "chores", urgency: "attention", retention: "untilViewed", unread: true }
+  ];
   module.unreadAttentionCount = 1;
 
   module.notificationReceived("NEW_PAGE", 4);
 
   assert.equal(module.currentPage, 4);
+  assert.equal(module.unreadAttentionCount, 1);
+  assert.equal(module.messages[0].unread, true);
+  assert.equal(renders, 1);
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
   assert.equal(module.unreadAttentionCount, 0);
   assert.equal(module.messages[0].unread, false);
+  assert.equal(renders, 2);
   assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
+});
+
+test("leaving the message page cancels pending viewed state", async () => {
+  const module = instance();
+  module.messages = [
+    { source: "chores", urgency: "attention", retention: "untilViewed", unread: true }
+  ];
+  module.unreadAttentionCount = 1;
+
+  module.notificationReceived("NEW_PAGE", 4);
+  module.notificationReceived("NEW_PAGE", 2);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(module.currentPage, 2);
+  assert.equal(module.messages[0].unread, true);
+  assert.equal(module.unreadAttentionCount, 1);
 });
 
 test("ignores invalid page actions", () => {
@@ -610,6 +887,21 @@ test("can disable Seymour attention notifications", () => {
 
   assert.equal(module.unreadAttentionCount, 1);
   assert.equal(module.notifications.some(({ name }) => name === "ATTENTION_ON"), false);
+});
+
+test("uses an integration-neutral switch for compatibility attention events", () => {
+  const module = instance({ legacyAttentionEvents: false, showToasts: false });
+
+  module.socketNotificationReceived("MC_MESSAGE", {
+    title: "Generic attention",
+    urgency: "attention",
+    retention: "untilViewed"
+  });
+
+  assert.deepEqual(
+    module.notifications.map(({ name }) => name),
+    ["MESSAGE_CENTER_ATTENTION_CHANGED"]
+  );
 });
 
 test("manual clear removes all messages and attention", () => {

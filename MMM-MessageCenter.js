@@ -1,10 +1,10 @@
-/* global Module, Log */
+/* global Module, Log, config */
 
 Module.register("MMM-MessageCenter", {
   defaults: {
     ui: "messages",
     pages: true,
-    attention: "seymour",
+    legacyAttentionEvents: true,
     messagesPage: 4,
     channelRoutes: {},
     maxMessages: 50,
@@ -15,6 +15,21 @@ Module.register("MMM-MessageCenter", {
     clearAttentionWhenViewed: true,
     internalNotifications: {
       enabled: true,
+      remoteControl: {
+        enabled: true,
+        mappings: {
+          MC_MESSAGE: {
+            mode: "message"
+          },
+          SHOW_ALERT: {
+            mode: "alert",
+            type: "remote.alert",
+            source: "magicmirror.remote-control",
+            urgency: "passive",
+            retention: "archive"
+          }
+        }
+      },
       weather: {
         enabled: false,
         rain: {
@@ -35,7 +50,7 @@ Module.register("MMM-MessageCenter", {
       }
     },
     webhook: {
-      host: "127.0.0.1",
+      host: "0.0.0.0",
       port: 8787,
       token: ""
     }
@@ -53,6 +68,7 @@ Module.register("MMM-MessageCenter", {
     this.returnTimer = null;
     this.autoNavigation = null;
     this.expirationTimer = null;
+    this.pendingView = null;
 
     this.sendSocketNotification("MC_START", this.config.webhook);
     this.sendNotification("QUERY_PAGE_NUMBER");
@@ -62,6 +78,7 @@ Module.register("MMM-MessageCenter", {
 
   stop() {
     this.cancelAutoNavigation();
+    this.cancelPendingView();
     this.stopExpirationTimer();
     this.sendSocketNotification("MC_STOP");
   },
@@ -102,7 +119,8 @@ Module.register("MMM-MessageCenter", {
 
     this.messages.forEach((message) => {
       const item = document.createElement("article");
-      item.className = `message-item message-${message.priority}${message.unread ? " unread" : ""}`;
+      item.className =
+        `message-item urgency-${message.urgency}${message.unread ? " unread" : ""}`;
 
       const heading = document.createElement("div");
       heading.className = "message-heading";
@@ -140,7 +158,7 @@ Module.register("MMM-MessageCenter", {
       const date = new Date(message.timestamp);
       timestamp.className = "message-time";
       timestamp.dateTime = date.toISOString();
-      timestamp.textContent = date.toLocaleString();
+      timestamp.textContent = this.formatMessageTimestamp(date);
       meta.appendChild(timestamp);
 
       item.appendChild(meta);
@@ -216,10 +234,79 @@ Module.register("MMM-MessageCenter", {
   getMessageSourceLabel(source) {
     const labels = {
       "magicmirror.weather": "Weather",
+      "magicmirror.remote-control": "Remote Control",
       "home-assistant": "Home Assistant",
+      "home-assistant.smartthings": "SmartThings via Home Assistant",
       smartthings: "SmartThings"
     };
     return labels[source] || source;
+  },
+
+  getGlobalDateTimePreferences() {
+    const globalConfig =
+      typeof config !== "undefined" &&
+      config &&
+      typeof config === "object" &&
+      !Array.isArray(config)
+        ? config
+        : {};
+    const timeFormat =
+      globalConfig.timeFormat === 12 || globalConfig.timeFormat === 24
+        ? globalConfig.timeFormat
+        : null;
+    const localeCandidates = [globalConfig.locale, globalConfig.language];
+    let locale;
+
+    for (const candidate of localeCandidates) {
+      if (typeof candidate !== "string" || !candidate.trim()) continue;
+      try {
+        new Intl.DateTimeFormat(candidate);
+        locale = candidate;
+        break;
+      } catch (_error) {
+        // Try the next configured preference, then the browser default.
+      }
+    }
+
+    return { locale, timeFormat };
+  },
+
+  formatMessageTimestamp(value) {
+    return this.formatDateTimeValue(value, true);
+  },
+
+  formatClockTime(value) {
+    return this.formatDateTimeValue(value, false);
+  },
+
+  formatDateTimeValue(value, includeDate) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const { locale, timeFormat } = this.getGlobalDateTimePreferences();
+    const options = {
+      ...(includeDate
+        ? {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric"
+          }
+        : {}),
+      hour: "numeric",
+      minute: "2-digit",
+      ...(includeDate ? { second: "2-digit" } : {}),
+      ...(timeFormat === 12
+        ? { hourCycle: "h12" }
+        : timeFormat === 24
+          ? { hourCycle: "h23" }
+          : {})
+    };
+
+    try {
+      return new Intl.DateTimeFormat(locale, options).format(date);
+    } catch (_error) {
+      return includeDate ? date.toLocaleString() : date.toLocaleTimeString();
+    }
   },
 
   notificationReceived(notification, payload, sender) {
@@ -235,12 +322,15 @@ Module.register("MMM-MessageCenter", {
       if (this.autoNavigation && payload !== this.autoNavigation.targetPage) {
         this.cancelAutoNavigation();
       }
+      if (payload !== this.resolvePageTarget("messages")) {
+        this.cancelPendingView();
+      }
       if (
         payload === this.resolvePageTarget("messages") &&
         this.config.clearAttentionWhenViewed &&
         this.unreadAttentionCount > 0
       ) {
-        this.markViewed();
+        this.scheduleMarkViewed();
       }
       return;
     }
@@ -261,11 +351,11 @@ Module.register("MMM-MessageCenter", {
     this.receiveMessage(payload);
   },
 
-  receiveMessage(payload) {
+  receiveMessage(payload, options = {}) {
     const message = this.normalizeMessage(payload);
     if (!message) {
       Log.warn("[MMM-MessageCenter] Ignored invalid or expired message");
-      return;
+      return false;
     }
 
     const previousAttentionState = this.getAttentionState();
@@ -282,7 +372,7 @@ Module.register("MMM-MessageCenter", {
       const duplicate = this.messages[duplicateIndex];
       if (this.isEquivalentMessage(duplicate, message)) {
         Log.info(`[MMM-MessageCenter] Ignored duplicate ${message.source}/${message.id}`);
-        return;
+        return false;
       }
       this.messages.splice(duplicateIndex, 1);
       inboxChanged = true;
@@ -295,7 +385,7 @@ Module.register("MMM-MessageCenter", {
     }
     if (inboxChanged) this.publishAttention(previousAttentionState);
 
-    if (this.config.showToasts) {
+    if (this.config.showToasts && options.showToast !== false) {
       this.sendNotification("SHOW_ALERT", {
         type: "notification",
         title: message.title,
@@ -310,16 +400,92 @@ Module.register("MMM-MessageCenter", {
 
     if (this.config.pages) this.handlePageAction(message.actions);
     this.updateDom(200);
+    return true;
   },
 
-  handleInternalNotification(notification, payload) {
+  handleInternalNotification(notification, payload, sender) {
     const internalConfig = this.config.internalNotifications;
     if (!internalConfig || internalConfig.enabled === false) return false;
+
+    if (this.isRemoteControlSender(sender)) {
+      return this.handleRemoteControlNotification(notification, payload);
+    }
 
     if (notification === "WEATHER_UPDATED") {
       return this.handleWeatherUpdated(payload);
     }
     return false;
+  },
+
+  isRemoteControlSender(sender) {
+    if (!sender || typeof sender !== "object") return false;
+    return (
+      sender.name === "MMM-Remote-Control" ||
+      sender.data?.module === "MMM-Remote-Control"
+    );
+  },
+
+  getRemoteControlNotificationConfig() {
+    const defaults = this.defaults.internalNotifications.remoteControl;
+    const configured = this.config.internalNotifications?.remoteControl || {};
+    return {
+      ...defaults,
+      ...configured,
+      mappings: configured.mappings === undefined
+        ? defaults.mappings
+        : configured.mappings
+    };
+  },
+
+  handleRemoteControlNotification(notification, payload) {
+    const config = this.getRemoteControlNotificationConfig();
+    if (
+      !config.enabled ||
+      !config.mappings ||
+      typeof config.mappings !== "object" ||
+      Array.isArray(config.mappings) ||
+      !Object.prototype.hasOwnProperty.call(config.mappings, notification)
+    ) {
+      return false;
+    }
+
+    const mapping = config.mappings[notification];
+    if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return false;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+
+    if (mapping.mode === "message") {
+      return this.receiveMessage({
+        ...payload,
+        source: payload.source || "magicmirror.remote-control"
+      });
+    }
+
+    if (mapping.mode !== "alert") return false;
+    const title = payload.title;
+    const body = payload.message ?? payload.body;
+    if (
+      (typeof title !== "string" || !title.trim()) &&
+      (typeof body !== "string" || !body.trim())
+    ) {
+      return false;
+    }
+
+    this.receiveMessage(
+      {
+        id: payload.id,
+        type: mapping.type || "remote.alert",
+        source: mapping.source || "magicmirror.remote-control",
+        entityId: payload.entityId,
+        title: typeof title === "string" && title.trim() ? title : "Remote alert",
+        body: typeof body === "string" ? body : "",
+        urgency: mapping.urgency,
+        retention: mapping.retention,
+        expires: payload.expires,
+        actions: mapping.actions
+      },
+      { showToast: false }
+    );
+    return true;
   },
 
   handleWeatherUpdated(payload, now = Date.now()) {
@@ -341,10 +507,7 @@ Module.register("MMM-MessageCenter", {
     if (alreadyTracked) return true;
 
     const location = payload.locationName ? ` near ${String(payload.locationName)}` : "";
-    const forecastTime = new Date(forecast.timestamp).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit"
-    });
+    const forecastTime = this.formatClockTime(forecast.timestamp);
     this.receiveMessage({
       id: rain.messageId,
       type: "weather.precipitation",
@@ -560,10 +723,17 @@ Module.register("MMM-MessageCenter", {
       this.sendNotification("MESSAGE_CENTER_ATTENTION_CHANGED", state);
     }
 
-    if (this.config.attention === "seymour") {
+    if (this.shouldPublishLegacyAttentionEvents()) {
       if (state.active) this.sendNotification("ATTENTION_ON", state.unreadCount);
       else if (previousState && previousState.active) this.sendNotification("ATTENTION_OFF");
     }
+  },
+
+  shouldPublishLegacyAttentionEvents() {
+    if (typeof this.config.attention === "string") {
+      return this.config.attention === "seymour";
+    }
+    return this.config.legacyAttentionEvents !== false;
   },
 
   clearAttention() {
@@ -573,6 +743,47 @@ Module.register("MMM-MessageCenter", {
     });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
+  },
+
+  scheduleMarkViewed() {
+    this.cancelPendingView();
+    this.updateDom(0);
+
+    const finish = () => {
+      this.pendingView = null;
+      if (this.currentPage === this.resolvePageTarget("messages")) {
+        this.markViewed();
+      }
+    };
+
+    if (
+      typeof requestAnimationFrame === "function" &&
+      typeof cancelAnimationFrame === "function"
+    ) {
+      const pending = { type: "frame", ids: [] };
+      this.pendingView = pending;
+      pending.ids.push(
+        requestAnimationFrame(() => {
+          pending.ids.push(requestAnimationFrame(finish));
+        })
+      );
+      return;
+    }
+
+    this.pendingView = {
+      type: "timer",
+      id: setTimeout(finish, 0)
+    };
+  },
+
+  cancelPendingView() {
+    if (!this.pendingView) return;
+    if (this.pendingView.type === "frame") {
+      this.pendingView.ids.forEach((id) => cancelAnimationFrame(id));
+    } else {
+      clearTimeout(this.pendingView.id);
+    }
+    this.pendingView = null;
   },
 
   clearRead() {

@@ -1,8 +1,23 @@
 {
   "name": "mmm-messagecenter",
   "version": "0.1.0",
-  "description": "Webhook-driven message center for MagicMirror² and MMM-pages",
+  "description": "Hardware-independent notification and attention hub for MagicMirror²",
   "private": true,
+  "author": "Brian Wente",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bwente/MMM-MessageCenter.git"
+  },
+  "homepage": "https://github.com/bwente/MMM-MessageCenter#readme",
+  "bugs": {
+    "url": "https://github.com/bwente/MMM-MessageCenter/issues"
+  },
+  "keywords": [
+    "magicmirror",
+    "notifications",
+    "home-assistant"
+  ],
   "scripts": {
     "test": "node --test"
   },

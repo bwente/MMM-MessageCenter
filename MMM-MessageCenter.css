@@ -21,7 +21,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 0 1rem;
-  background: linear-gradient(#000 72%, transparent);
+  background: linear-gradient(
+    var(--message-center-header-background, transparent) 72%,
+    transparent
+  );
 }
 
 .messages-heading {
@@ -80,11 +83,28 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.045);
+  transition: border-color 220ms ease, background-color 220ms ease;
 }
 
 .message-item.unread {
-  border-left: 4px solid rgba(255, 190, 72, 0.95);
   background: rgba(255, 190, 72, 0.08);
+}
+
+.message-item.urgency-attention {
+  border-left: 4px solid rgba(255, 190, 72, 0.42);
+}
+
+.message-item.urgency-attention.unread {
+  border-left-color: rgba(255, 190, 72, 0.95);
+}
+
+.message-item.urgency-critical {
+  border-left: 4px solid rgba(255, 92, 92, 0.48);
+}
+
+.message-item.urgency-critical.unread {
+  border-left-color: rgba(255, 92, 92, 0.98);
+  background: rgba(255, 92, 92, 0.09);
 }
 
 .message-item.unread .message-title {

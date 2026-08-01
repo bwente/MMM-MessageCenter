@@ -174,29 +174,30 @@ producers merely to control hardware.
 
 ### Phase 1 — working baseline
 
-- HTTP webhook with bearer-token support;
-- normalized message object;
-- newest-first in-memory queue;
-- toast notifications;
-- attention lifecycle compatibility events;
-- optional MMM-pages routing and timed return;
-- user navigation cancels automatic return;
-- built-in inbox with unread treatment and acknowledgement;
-- confirmed Home Assistant delivery on Seymour.
+- HTTP webhook with optional bearer-token support (implemented);
+- normalized message object (implemented);
+- newest-first in-memory queue (implemented);
+- toast notifications (implemented);
+- attention lifecycle compatibility events (implemented);
+- optional MMM-pages routing and timed return (implemented);
+- user navigation cancels automatic return (implemented);
+- built-in inbox with unread treatment and bulk acknowledgement (implemented);
+- confirmed Home Assistant delivery on Seymour (implemented).
 
 ### Phase 2 — appliance UX and lifecycle
 
-- message icons and source identity;
+- message icons and broader source identity;
 - categories and filtering;
-- deduplication by source and message ID;
-- active expiration and message aging;
+- deduplication by source and message ID (implemented);
+- active expiration (implemented) and message aging;
 - separate urgency and retention fields (implemented);
-- individual and bulk acknowledgement;
-- structured attention-state event;
+- individual acknowledgement and dismissal; bulk acknowledgement is implemented;
+- structured attention-state event (implemented);
 - semantic channel destinations (implemented);
 - internal MagicMirror notification-provider foundation (implemented);
 - one-hour rain alert from the default weather module (implemented);
-- continued physical-device layout and interaction testing.
+- explicit MMM-Remote-Control alert and message ingestion (implemented);
+- continued physical-device layout and interaction testing (ongoing).
 
 ### Phase 3 — reliable and rich notifications
 
