@@ -336,8 +336,11 @@ are cleared, or are displaced by `maxMessages`.
 
 The header distinguishes unread attention from retained history. **Mark all
 read** acknowledges unread messages; **Clear read** removes only acknowledged
-history and preserves anything still unread. Known internal sources are shown
-with friendly labels, such as **Weather** instead of `magicmirror.weather`.
+history and preserves anything still unread. Each full-page message also has
+**Mark read** and **Dismiss** controls. Compact mode keeps per-message controls
+hidden unless `compactShowControls: true` is configured. Known internal sources
+are shown with friendly labels, such as **Weather** instead of
+`magicmirror.weather`.
 
 A timed page action returns only while MessageCenter still owns the automatic
 navigation. Turning the encoder, touching another channel, or otherwise changing
@@ -349,7 +352,10 @@ timed alerts preserve the page that was visible before the first alert.
 MMM-MessageCenter emits `ATTENTION_ON` with the unread count and
 `ATTENTION_OFF` when attention is cleared. Other modules may send `MC_ACK_ALL`
 to mark messages read, `MC_CLEAR_READ` to remove acknowledged history while
-preserving unread messages, or `MC_CLEAR_ALL` to empty the inbox.
+preserving unread messages, or `MC_CLEAR_ALL` to empty the inbox. To act on one
+message, send `MC_ACK_MESSAGE` or `MC_DISMISS_MESSAGE` with
+`{ source: "message-source", id: "message-id" }`. Both fields are required so
+identical IDs from different providers remain independent.
 
 It also emits `MESSAGE_CENTER_ATTENTION_CHANGED` with `active`, `unreadCount`,
 `highestUrgency`, `highestPriority` (compatibility alias), and `sources`. The

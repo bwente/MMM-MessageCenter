@@ -152,6 +152,29 @@
   flex: none;
 }
 
+.message-controls {
+  display: flex;
+  flex: none;
+  gap: 0.4rem;
+}
+
+.message-acknowledge,
+.message-dismiss {
+  min-height: 36px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  font-size: 0.72rem;
+  touch-action: manipulation;
+}
+
+.message-dismiss {
+  color: rgba(255, 255, 255, 0.62);
+}
+
 .messages-empty {
   padding: 4rem 1rem;
   text-align: center;
@@ -170,7 +193,9 @@
 }
 
 .messages-acknowledge:focus-visible,
-.messages-clear-read:focus-visible {
+.messages-clear-read:focus-visible,
+.message-acknowledge:focus-visible,
+.message-dismiss:focus-visible {
   outline: 3px solid rgba(255, 255, 255, 0.95);
   outline-offset: 3px;
 }
@@ -243,6 +268,13 @@
 .messages-compact .message-meta {
   margin-top: 0.2rem;
   font-size: 0.7rem;
+}
+
+.messages-compact .message-acknowledge,
+.messages-compact .message-dismiss {
+  min-height: 30px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.62rem;
 }
 
 .messages-compact .messages-empty {

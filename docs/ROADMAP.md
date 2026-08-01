@@ -192,7 +192,7 @@ producers merely to control hardware.
 - deduplication by source and message ID (implemented);
 - active expiration (implemented) and message aging;
 - separate urgency and retention fields (implemented);
-- individual acknowledgement and dismissal; bulk acknowledgement is implemented;
+- individual and bulk acknowledgement and dismissal (implemented);
 - structured attention-state event (implemented);
 - semantic channel destinations (implemented);
 - internal MagicMirror notification-provider foundation (implemented);

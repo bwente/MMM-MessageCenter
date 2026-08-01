@@ -248,6 +248,66 @@ test("clear read keeps unread messages and removes read history", () => {
   assert.equal(module.clearRead(), false);
 });
 
+test("acknowledges one message without changing its retained history", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [
+    { id: "door", source: "entry", urgency: "critical", unread: true },
+    { id: "rain", source: "weather", urgency: "attention", unread: true }
+  ];
+  module.unreadAttentionCount = 2;
+
+  assert.equal(module.acknowledgeMessage("entry", "door"), true);
+  assert.deepEqual(module.messages.map(({ id, unread }) => ({ id, unread })), [
+    { id: "door", unread: false },
+    { id: "rain", unread: true }
+  ]);
+  assert.equal(module.unreadAttentionCount, 1);
+  assert.equal(module.acknowledgeMessage("entry", "door"), false);
+});
+
+test("dismisses one message and clears its attention", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [
+    { id: "door", source: "entry", urgency: "critical", unread: true },
+    { id: "door", source: "garage", urgency: "attention", unread: true }
+  ];
+  module.unreadAttentionCount = 2;
+
+  assert.equal(module.dismissMessage("entry", "door"), true);
+  assert.deepEqual(module.messages.map(({ source }) => source), ["garage"]);
+  assert.equal(module.unreadAttentionCount, 1);
+});
+
+test("accepts targeted acknowledgement and dismissal notifications", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [
+    { id: "one", source: "chores", urgency: "attention", unread: true },
+    { id: "two", source: "chores", urgency: "passive", unread: false }
+  ];
+  module.unreadAttentionCount = 1;
+
+  module.notificationReceived("MC_ACK_MESSAGE", { source: "chores", id: "one" });
+  module.notificationReceived("MC_DISMISS_MESSAGE", { source: "chores", id: "two" });
+
+  assert.deepEqual(module.messages.map(({ id, unread }) => ({ id, unread })), [
+    { id: "one", unread: false }
+  ]);
+  assert.equal(module.unreadAttentionCount, 0);
+});
+
+test("ignores malformed or unknown targeted message commands", () => {
+  const module = instance({ showToasts: false });
+  module.messages = [{ id: "one", source: "chores", unread: true }];
+
+  assert.equal(module.handleMessageCommand(null, "acknowledge"), false);
+  assert.equal(module.handleMessageCommand({ source: "chores" }, "dismiss"), false);
+  assert.equal(
+    module.handleMessageCommand({ source: "chores", id: "missing" }, "acknowledge"),
+    false
+  );
+  assert.equal(module.messages[0].unread, true);
+});
+
 test("presents friendly labels for known internal sources", () => {
   const module = instance();
 

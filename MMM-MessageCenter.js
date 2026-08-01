@@ -166,6 +166,34 @@ Module.register("MMM-MessageCenter", {
       timestamp.textContent = this.formatDisplayedTimestamp(date);
       meta.appendChild(timestamp);
 
+      if (this.shouldShowMessageControls()) {
+        const controls = document.createElement("div");
+        controls.className = "message-controls";
+
+        if (message.unread) {
+          const acknowledge = document.createElement("button");
+          acknowledge.className = "message-acknowledge";
+          acknowledge.type = "button";
+          acknowledge.textContent = "Mark read";
+          acknowledge.setAttribute("aria-label", `Mark ${message.title} read`);
+          acknowledge.addEventListener("click", () => {
+            this.acknowledgeMessage(message.source, message.id);
+          });
+          controls.appendChild(acknowledge);
+        }
+
+        const dismiss = document.createElement("button");
+        dismiss.className = "message-dismiss";
+        dismiss.type = "button";
+        dismiss.textContent = "Dismiss";
+        dismiss.setAttribute("aria-label", `Dismiss ${message.title}`);
+        dismiss.addEventListener("click", () => {
+          this.dismissMessage(message.source, message.id);
+        });
+        controls.appendChild(dismiss);
+        meta.appendChild(controls);
+      }
+
       item.appendChild(meta);
       wrapper.appendChild(item);
     });
@@ -250,6 +278,10 @@ Module.register("MMM-MessageCenter", {
         ? this.config.compactMaxMessages
         : this.defaults.compactMaxMessages;
     return this.messages.slice(0, limit);
+  },
+
+  shouldShowMessageControls() {
+    return this.getDisplayMode() !== "compact" || this.config.compactShowControls === true;
   },
 
   getMessageSourceLabel(source) {
@@ -363,6 +395,8 @@ Module.register("MMM-MessageCenter", {
     }
 
     if (notification === "MC_ACK_ALL") this.clearAttention();
+    if (notification === "MC_ACK_MESSAGE") this.handleMessageCommand(payload, "acknowledge");
+    if (notification === "MC_DISMISS_MESSAGE") this.handleMessageCommand(payload, "dismiss");
     if (notification === "MC_CLEAR_READ") this.clearRead();
     if (notification === "MC_CLEAR_ALL") this.clearMessages();
     this.handleInternalNotification(notification, payload, sender);
@@ -770,6 +804,31 @@ Module.register("MMM-MessageCenter", {
     });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
+  },
+
+  handleMessageCommand(payload, action) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    if (payload.source === undefined || payload.id === undefined) return false;
+    return action === "acknowledge"
+      ? this.acknowledgeMessage(String(payload.source), String(payload.id))
+      : this.dismissMessage(String(payload.source), String(payload.id));
+  },
+
+  acknowledgeMessage(source, id) {
+    const message = this.messages.find(
+      (candidate) => candidate.source === source && candidate.id === id
+    );
+    if (!message || !message.unread) return false;
+
+    const previousAttentionState = this.getAttentionState();
+    message.unread = false;
+    this.publishAttention(previousAttentionState);
+    this.updateDom(200);
+    return true;
+  },
+
+  dismissMessage(source, id) {
+    return this.resolveMessage(source, id);
   },
 
   scheduleMarkViewed() {

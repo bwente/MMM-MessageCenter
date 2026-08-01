@@ -8,6 +8,7 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 - Normalized message contract with independent urgency and retention.
 - Newest-first in-memory history, expiration, deduplication, and acknowledgement.
+- Individual message acknowledgement and dismissal controls and notifications.
 - Webhook ingestion with optional bearer authentication.
 - MagicMirror internal notification ingestion for weather and MMM-Remote-Control.
 - Toasts, semantic attention state, and optional MMM-pages channel routing.
