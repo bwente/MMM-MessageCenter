@@ -54,6 +54,30 @@ test("defaults the message center to page four", () => {
   assert.equal(definition.defaults.messagesPage, 4);
 });
 
+test("defaults to the full page display mode", () => {
+  const module = instance();
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }, { id: "four" }];
+
+  assert.equal(module.getDisplayMode(), "page");
+  assert.equal(module.getDisplayedMessages().length, 4);
+});
+
+test("compact mode limits visible history without changing the queue", () => {
+  const module = instance({ displayMode: "compact", compactMaxMessages: 2 });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
+
+  assert.equal(module.getDisplayMode(), "compact");
+  assert.deepEqual(module.getDisplayedMessages().map(({ id }) => id), ["one", "two"]);
+  assert.equal(module.messages.length, 3);
+});
+
+test("compact mode falls back safely for an invalid visible-message limit", () => {
+  const module = instance({ displayMode: "compact", compactMaxMessages: 0 });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }, { id: "four" }];
+
+  assert.equal(module.getDisplayedMessages().length, definition.defaults.compactMaxMessages);
+});
+
 test("normalizes an attention message", () => {
   const module = instance();
   const message = module.normalizeMessage({
@@ -255,6 +279,15 @@ test("formats timestamps using MagicMirror 24-hour preferences", () => {
     assert.match(module.formatMessageTimestamp(date), /14:05:06/);
     assert.match(module.formatClockTime(date), /14:05/);
     assert.doesNotMatch(module.formatClockTime(date), /AM|PM/i);
+  });
+});
+
+test("compact mode uses a time-only metadata timestamp", () => {
+  const module = instance({ displayMode: "compact" });
+  const date = new Date(2026, 6, 23, 14, 5, 6);
+
+  withGlobalConfig({ timeFormat: 12, locale: "en-US" }, () => {
+    assert.match(module.formatDisplayedTimestamp(date), /^2:05\s*PM$/i);
   });
 });
 

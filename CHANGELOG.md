@@ -15,6 +15,7 @@ All notable changes to MMM-MessageCenter are documented in this file.
   former Seymour-named option.
 - Inbox UI with urgency styling, read-state transitions, history controls, and
   MagicMirror locale and clock-format support.
+- Compact region-friendly presentation for standard MagicMirror layouts.
 - Unit tests, product roadmap, static UI preview, and live-test checklist.
 
 ### Security

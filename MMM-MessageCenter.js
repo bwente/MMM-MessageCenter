@@ -3,6 +3,9 @@
 Module.register("MMM-MessageCenter", {
   defaults: {
     ui: "messages",
+    displayMode: "page",
+    compactMaxMessages: 3,
+    compactShowControls: false,
     pages: true,
     legacyAttentionEvents: true,
     messagesPage: 4,
@@ -91,7 +94,7 @@ Module.register("MMM-MessageCenter", {
     }
 
     const wrapper = document.createElement("section");
-    wrapper.className = "messages-wrapper";
+    wrapper.className = `messages-wrapper messages-${this.getDisplayMode()}`;
     wrapper.setAttribute("aria-label", "Message center");
     wrapper.setAttribute("aria-live", "polite");
 
@@ -108,16 +111,18 @@ Module.register("MMM-MessageCenter", {
       emptyTitle.textContent = "You’re all caught up";
       empty.appendChild(emptyTitle);
 
-      const emptyDetail = document.createElement("p");
-      emptyDetail.className = "messages-empty-detail";
-      emptyDetail.textContent = "New household messages will appear here.";
-      empty.appendChild(emptyDetail);
+      if (this.getDisplayMode() !== "compact") {
+        const emptyDetail = document.createElement("p");
+        emptyDetail.className = "messages-empty-detail";
+        emptyDetail.textContent = "New household messages will appear here.";
+        empty.appendChild(emptyDetail);
+      }
 
       wrapper.appendChild(empty);
       return wrapper;
     }
 
-    this.messages.forEach((message) => {
+    this.getDisplayedMessages().forEach((message) => {
       const item = document.createElement("article");
       item.className =
         `message-item urgency-${message.urgency}${message.unread ? " unread" : ""}`;
@@ -158,7 +163,7 @@ Module.register("MMM-MessageCenter", {
       const date = new Date(message.timestamp);
       timestamp.className = "message-time";
       timestamp.dateTime = date.toISOString();
-      timestamp.textContent = this.formatMessageTimestamp(date);
+      timestamp.textContent = this.formatDisplayedTimestamp(date);
       meta.appendChild(timestamp);
 
       item.appendChild(meta);
@@ -196,10 +201,12 @@ Module.register("MMM-MessageCenter", {
     heading.appendChild(count);
     header.appendChild(heading);
 
+    const showControls =
+      this.getDisplayMode() !== "compact" || this.config.compactShowControls === true;
     const controls = document.createElement("div");
     controls.className = "messages-controls";
 
-    if (counts.unread > 0) {
+    if (showControls && counts.unread > 0) {
       const acknowledge = document.createElement("button");
       acknowledge.className = "messages-acknowledge";
       acknowledge.type = "button";
@@ -208,7 +215,7 @@ Module.register("MMM-MessageCenter", {
       controls.appendChild(acknowledge);
     }
 
-    if (counts.read > 0) {
+    if (showControls && counts.read > 0) {
       const clearRead = document.createElement("button");
       clearRead.className = "messages-clear-read";
       clearRead.type = "button";
@@ -229,6 +236,20 @@ Module.register("MMM-MessageCenter", {
       unread,
       read: this.messages.length - unread
     };
+  },
+
+  getDisplayMode() {
+    return this.config.displayMode === "compact" ? "compact" : "page";
+  },
+
+  getDisplayedMessages() {
+    if (this.getDisplayMode() !== "compact") return this.messages;
+    const limit =
+      Number.isInteger(this.config.compactMaxMessages) &&
+      this.config.compactMaxMessages > 0
+        ? this.config.compactMaxMessages
+        : this.defaults.compactMaxMessages;
+    return this.messages.slice(0, limit);
   },
 
   getMessageSourceLabel(source) {
@@ -277,6 +298,12 @@ Module.register("MMM-MessageCenter", {
 
   formatClockTime(value) {
     return this.formatDateTimeValue(value, false);
+  },
+
+  formatDisplayedTimestamp(value) {
+    return this.getDisplayMode() === "compact"
+      ? this.formatClockTime(value)
+      : this.formatMessageTimestamp(value);
   },
 
   formatDateTimeValue(value, includeDate) {

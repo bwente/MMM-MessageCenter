@@ -175,6 +175,84 @@
   outline-offset: 3px;
 }
 
+.messages-wrapper.messages-compact {
+  width: min(360px, 100%);
+  margin-inline: 0;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  font-size: 0.9rem;
+}
+
+.messages-compact .messages-header {
+  position: static;
+  gap: 0.5rem;
+  padding: 0 0 0.45rem;
+  background: none;
+}
+
+.messages-compact .messages-heading {
+  gap: 0.45rem;
+}
+
+.messages-compact .messages-title {
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.messages-compact .messages-count {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+}
+
+.messages-compact .messages-controls {
+  gap: 0.3rem;
+}
+
+.messages-compact .messages-acknowledge,
+.messages-compact .messages-clear-read {
+  min-height: 32px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.7rem;
+}
+
+.messages-compact .message-item {
+  margin-bottom: 0.4rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+}
+
+.messages-compact .message-title {
+  font-size: 1rem;
+}
+
+.messages-compact .message-unread-indicator {
+  padding: 0.08rem 0.3rem;
+  font-size: 0.58rem;
+}
+
+.messages-compact .message-body {
+  display: -webkit-box;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.messages-compact .message-meta {
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+}
+
+.messages-compact .messages-empty {
+  padding: 0.75rem 0;
+}
+
+.messages-compact .messages-empty-title {
+  font-size: 0.9rem;
+}
+
 @media (max-height: 640px) {
   .messages-wrapper {
     max-height: calc(100vh - 48px);

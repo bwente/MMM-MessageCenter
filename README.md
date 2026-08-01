@@ -40,6 +40,31 @@ npm install --omit=dev
 
 ## Configuration
 
+### Standard MagicMirror region
+
+Compact mode is designed for an ordinary MagicMirror region and does not
+require MMM-pages, Seymour, or any hardware integration:
+
+```js
+{
+  module: "MMM-MessageCenter",
+  position: "top_right",
+  config: {
+    displayMode: "compact",
+    compactMaxMessages: 3,
+    pages: false
+  }
+}
+```
+
+It shows the newest messages in a narrow region, uses time-only metadata, and
+keeps the complete bounded queue available internally. History buttons are
+hidden by default in compact mode; set `compactShowControls: true` for touch or
+interactive browser installations. Other modules can always use `MC_ACK_ALL`,
+`MC_CLEAR_READ`, and `MC_CLEAR_ALL`.
+
+### Full-page inbox
+
 ```js
 {
   module: "MMM-MessageCenter",
@@ -47,6 +72,7 @@ npm install --omit=dev
   classes: "message-center-page",
   config: {
     ui: "messages",
+    displayMode: "page",
     pages: true,
     legacyAttentionEvents: true,
     messagesPage: 4,
@@ -96,6 +122,9 @@ Place the module class on the corresponding MMM-pages page:
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
+| `displayMode` | string | `"page"` | Use `page` for the full inbox or `compact` for a normal MagicMirror region. |
+| `compactMaxMessages` | integer | `3` | Maximum newest messages rendered in compact mode; the underlying queue is unchanged. |
+| `compactShowControls` | boolean | `false` | Show condensed history buttons in compact mode. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
 | `legacyAttentionEvents` | boolean | `true` | Emit compatibility `ATTENTION_ON` and `ATTENTION_OFF` notifications. Structured attention state remains the preferred contract. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |

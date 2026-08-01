@@ -182,6 +182,7 @@ producers merely to control hardware.
 - optional MMM-pages routing and timed return (implemented);
 - user navigation cancels automatic return (implemented);
 - built-in inbox with unread treatment and bulk acknowledgement (implemented);
+- compact region-friendly inbox presentation (implemented);
 - confirmed Home Assistant delivery on Seymour (implemented).
 
 ### Phase 2 — appliance UX and lifecycle
