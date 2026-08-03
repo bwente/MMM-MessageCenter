@@ -140,14 +140,16 @@ The module resolves semantic channels to the installed page indexes.
 
 ## Input providers
 
-The HTTP webhook and MagicMirror's internal notification bus are the first
-providers. The default weather integration consumes provider-neutral
-`WEATHER_UPDATED` data and applies the first configurable forecast rule.
+The HTTP webhook, MQTT transport, Unix-domain socket, and MagicMirror's internal
+notification bus feed the same normalization path. MQTT and the Unix socket are
+optional and disabled by default. The default weather integration consumes
+provider-neutral `WEATHER_UPDATED` data and applies the first configurable
+forecast rule.
 
 Future provider work may include:
 
 - additional rules for calendar, news, media, camera, and system notifications;
-- MQTT topics and Home Assistant entities;
+- broader MQTT topic policies and Home Assistant entities;
 - calendars and scheduled reminders;
 - cameras and doorbells;
 - weather alert feeds;
@@ -203,11 +205,12 @@ producers merely to control hardware.
 ### Phase 3 — reliable and rich notifications
 
 - persistent storage and restart recovery;
-- camera snapshots and media attachments;
+- ingestion-time cached JPEG, PNG, and WebP snapshots (implemented); broader media attachments remain future work;
 - configurable sounds and speech;
 - safe notification actions;
 - critical-alert and manual-acknowledgement policy;
-- transport adapters for webhook, MQTT, and other external inputs.
+- transport adapters for webhook, MQTT, and Unix-domain-socket inputs (implemented);
+- additional external transport adapters as justified by real integrations.
 
 ### Phase 4 — notification platform
 

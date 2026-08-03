@@ -113,6 +113,22 @@ test("normalizes the refined contract independently of legacy priority", () => {
   assert.equal(criticalDefault.retention, "untilAcknowledged");
 });
 
+test("normalizes only cached image snapshots", () => {
+  const module = instance();
+  const dataUrl = `data:image/png;base64,${Buffer.from("snapshot").toString("base64")}`;
+  const message = module.normalizeMessage({
+    image: { dataUrl, alt: "Person at the front door", capturedAt: 1234 }
+  });
+
+  assert.deepEqual(message.image, {
+    dataUrl,
+    alt: "Person at the front door",
+    capturedAt: 1234
+  });
+  assert.equal(module.normalizeMessage({ image: { url: "https://example.com/live.jpg" } }).image, null);
+  assert.equal(module.normalizeMessage({ image: { dataUrl: "data:text/html;base64,AAAA" } }).image, null);
+});
+
 test("rejects invalid and expired messages", () => {
   const module = instance();
 
@@ -223,6 +239,18 @@ test("replaces duplicate source and id messages with the newest copy", () => {
 
   assert.equal(module.messages.length, 1);
   assert.equal(module.messages[0].title, "Complete");
+});
+
+test("ignores stale asynchronous updates and orders history by timestamp", () => {
+  const module = instance({ showToasts: false });
+  module.receiveMessage({ id: "door", source: "camera", title: "New", timestamp: 200 });
+  module.receiveMessage({ id: "weather", source: "weather", title: "Earlier", timestamp: 150 });
+
+  assert.equal(
+    module.receiveMessage({ id: "door", source: "camera", title: "Old", timestamp: 100 }),
+    false
+  );
+  assert.deepEqual(module.messages.map(({ title }) => title), ["New", "Earlier"]);
 });
 
 test("reports separate total, unread, and read history counts", () => {

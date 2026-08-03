@@ -78,6 +78,7 @@
 }
 
 .message-item {
+  position: relative;
   margin-bottom: 0.65rem;
   padding: 0.9rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -130,6 +131,16 @@
 .message-body {
   margin: 0.35rem 0 0;
   opacity: 0.85;
+}
+
+.message-image {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  margin-top: 0.65rem;
+  border-radius: 10px;
+  object-fit: contain;
+  object-position: center;
 }
 
 .message-meta {
@@ -263,6 +274,23 @@
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.messages-compact .message-image {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.65rem;
+  width: 96px;
+  height: 64px;
+  margin: 0;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.messages-compact .message-item.has-image .message-heading,
+.messages-compact .message-item.has-image .message-body,
+.messages-compact .message-item.has-image .message-meta {
+  padding-right: 104px;
 }
 
 .messages-compact .message-meta {

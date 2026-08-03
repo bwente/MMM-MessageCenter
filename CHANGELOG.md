@@ -10,6 +10,8 @@ All notable changes to MMM-MessageCenter are documented in this file.
 - Newest-first in-memory history, expiration, deduplication, and acknowledgement.
 - Individual message acknowledgement and dismissal controls and notifications.
 - Webhook ingestion with optional bearer authentication.
+- Optional MQTT and Unix-domain-socket transports using the same normalized schema.
+- Optional ingestion-time image snapshots with full-page and compact presentation.
 - MagicMirror internal notification ingestion for weather and MMM-Remote-Control.
 - Toasts, semantic attention state, and optional MMM-pages channel routing.
 - Integration-neutral attention-event configuration with compatibility for the
@@ -24,3 +26,5 @@ All notable changes to MMM-MessageCenter are documented in this file.
 - Webhook JSON size limits and optional bearer-token enforcement.
 - Explicit allowlisting for MMM-Remote-Control ingestion to avoid operational
   traffic and recursive MessageCenter events.
+- Image download limits, timeouts, signature checks, bounded redirects, and
+  private-host/unencrypted-HTTP blocking by default.

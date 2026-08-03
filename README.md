@@ -97,6 +97,27 @@ interactive browser installations. Other modules can always use `MC_ACK_ALL`,
       host: "0.0.0.0",
       port: 8787,
       token: ""
+    },
+    transports: {
+      mqtt: {
+        enabled: false,
+        url: "mqtt://127.0.0.1:1883",
+        topic: "messagecenter/messages",
+        username: "",
+        password: ""
+      },
+      unixSocket: {
+        enabled: false,
+        path: "/tmp/mmm-messagecenter.sock",
+        mode: 0o600
+      }
+    },
+    images: {
+      enabled: false,
+      maxBytes: 1024 * 1024,
+      timeout: 5000,
+      allowPrivateHosts: false,
+      allowHttp: false
     }
   }
 }
@@ -142,6 +163,19 @@ Place the module class on the corresponding MMM-pages page:
 | `webhook.host` | string | `"0.0.0.0"` | Address on which the webhook listens. The default accepts devices on the local network. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
 | `webhook.token` | string | `""` | Optional bearer token. When configured, every webhook request must provide it. |
+| `transports.mqtt.enabled` | boolean | `false` | Subscribe to MQTT messages using the existing MessageCenter schema. |
+| `transports.mqtt.url` | string | `"mqtt://127.0.0.1:1883"` | MQTT broker URL. Keep credentials in the separate username and password settings. |
+| `transports.mqtt.topic` | string | `"messagecenter/messages"` | Exact MQTT topic to subscribe to. Use `topics` with an array for several exact topics. |
+| `transports.mqtt.username` | string | `""` | Optional MQTT username stored only in private MagicMirror configuration. |
+| `transports.mqtt.password` | string | `""` | Optional MQTT password stored only in private MagicMirror configuration. |
+| `transports.unixSocket.enabled` | boolean | `false` | Accept newline-delimited JSON from local processes through a Unix-domain socket. |
+| `transports.unixSocket.path` | string | `"/tmp/mmm-messagecenter.sock"` | Absolute local socket path. |
+| `transports.unixSocket.mode` | integer | `0o600` | Filesystem permissions applied to the socket. |
+| `images.enabled` | boolean | `false` | Fetch and preserve one remote image when a message enters through REST, MQTT, or the Unix socket. |
+| `images.maxBytes` | integer | `1048576` | Maximum downloaded snapshot size; accepted range is 1 KiB through 5 MiB. |
+| `images.timeout` | integer | `5000` | Image download timeout in milliseconds. |
+| `images.allowPrivateHosts` | boolean | `false` | Permit image hosts resolving to private or local addresses. Enable only for trusted camera networks. |
+| `images.allowHttp` | boolean | `false` | Permit unencrypted HTTP image URLs. HTTPS remains required by default. |
 
 Messages are stored only in memory and reset when MagicMirror restarts.
 Inbox timestamps and newly generated weather-alert times follow MagicMirror's
@@ -302,6 +336,89 @@ When `webhook.token` is empty, MessageCenter logs a warning at startup. Set
 `webhook.host` to `"127.0.0.1"` when only software running on the mirror should
 be able to submit messages.
 
+### MQTT
+
+MQTT is optional and disabled by default. Enable it when the installation
+already has a broker; REST remains the easiest transport for new users. MQTT
+payloads use exactly the same message schema as the webhook. The adapter
+reconnects automatically, subscribes at QoS 0, accepts up to 32 KiB, and does
+not log credentials.
+
+Home Assistant can publish a message without changing its semantic fields:
+
+```yaml
+action: mqtt.publish
+data:
+  topic: messagecenter/messages
+  payload: |-
+    {
+      "id": "storage-warning",
+      "type": "system.storage",
+      "source": "home-assistant",
+      "title": "Storage running low",
+      "body": "The mirror has less than 10% free space.",
+      "urgency": "attention",
+      "retention": "untilAcknowledged"
+    }
+```
+
+Use stable source/ID pairs for conditions that may be reported repeatedly;
+MessageCenter's normal update and deduplication behavior applies regardless of
+transport. MQTT wildcard subscriptions are not currently supported.
+
+### Unix socket
+
+The Unix-domain socket is intended for trusted monitoring scripts running on
+the mirror. It does not open a network port. Each newline-delimited JSON object
+is normalized through the same path as REST and MQTT. The default `0o600` mode
+allows only the MagicMirror process owner to connect; widen it deliberately
+only when another local service account must publish.
+
+For example, with `socat` installed:
+
+```sh
+printf '%s\n' '{"id":"system-network","type":"system.network","source":"system-monitor","title":"Network unavailable","body":"Connectivity has been unavailable for five minutes.","urgency":"attention","retention":"untilAcknowledged"}' \
+  | socat - UNIX-CONNECT:/tmp/mmm-messagecenter.sock
+```
+
+MessageCenter supplies the transport, schema, and presentation. Disk, network,
+temperature, and service checks should remain separate monitoring scripts or
+services so the module stays hardware-independent.
+
+### Image snapshots
+
+When `images.enabled` is true, messages arriving through REST, MQTT, or the Unix
+socket may include one image URL:
+
+```json
+{
+  "id": "front-door-2026-08-02T12:00:00Z",
+  "type": "security.doorbell",
+  "source": "home-assistant",
+  "title": "Someone is at the door",
+  "body": "Doorbell motion was detected.",
+  "urgency": "attention",
+  "retention": "untilAcknowledged",
+  "image": {
+    "url": "https://images.example.net/events/doorbell.png",
+    "alt": "Doorbell camera snapshot"
+  }
+}
+```
+
+MessageCenter downloads the snapshot during ingestion and embeds the captured
+bytes in the in-memory message. The image therefore does not change if the URL
+later points to a newer camera frame. Full-page cards show a larger contained
+image; compact cards show a 96-by-64-pixel recognition thumbnail. Text remains
+the authoritative alert and is still delivered if the image cannot be cached.
+
+Only JPEG, PNG, and WebP content is accepted. MessageCenter validates both the
+response content type and file signature, follows at most three validated
+redirects, and does not pass the original URL to the browser. HTTPS and public
+hosts are required by default. Private hosts and HTTP each require a separate,
+explicit opt-in. Images remain in memory and disappear with message history or
+when MagicMirror restarts.
+
 ## Message schema
 
 The refined contract separates urgency from retention. Existing senders using
@@ -320,6 +437,8 @@ The refined contract separates urgency from retention. Existing senders using
 | `priority` | string | Legacy compatibility field: `ephemeral` or `attention`. |
 | `timestamp` | number | Epoch timestamp in milliseconds. |
 | `expires` | number | Optional expiration time in milliseconds. |
+| `image.url` | string | Optional snapshot URL for enabled external image ingestion. HTTPS is required by default. |
+| `image.alt` | string | Short accessible description of the snapshot. |
 | `actions.switchChannel` | string or integer | Semantic destination or legacy MMM-pages index. `messages` is built in. |
 | `actions.timeout` | number | Optional milliseconds before returning. |
 

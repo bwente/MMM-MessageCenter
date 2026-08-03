@@ -56,6 +56,27 @@ Module.register("MMM-MessageCenter", {
       host: "0.0.0.0",
       port: 8787,
       token: ""
+    },
+    transports: {
+      mqtt: {
+        enabled: false,
+        url: "mqtt://127.0.0.1:1883",
+        topic: "messagecenter/messages",
+        username: "",
+        password: ""
+      },
+      unixSocket: {
+        enabled: false,
+        path: "/tmp/mmm-messagecenter.sock",
+        mode: 0o600
+      }
+    },
+    images: {
+      enabled: false,
+      maxBytes: 1024 * 1024,
+      timeout: 5000,
+      allowPrivateHosts: false,
+      allowHttp: false
     }
   },
 
@@ -73,7 +94,11 @@ Module.register("MMM-MessageCenter", {
     this.expirationTimer = null;
     this.pendingView = null;
 
-    this.sendSocketNotification("MC_START", this.config.webhook);
+    this.sendSocketNotification("MC_START", {
+      webhook: this.config.webhook,
+      transports: this.config.transports,
+      images: this.config.images
+    });
     this.sendNotification("QUERY_PAGE_NUMBER");
     this.startExpirationTimer();
     Log.info("[MMM-MessageCenter] Started");
@@ -125,7 +150,8 @@ Module.register("MMM-MessageCenter", {
     this.getDisplayedMessages().forEach((message) => {
       const item = document.createElement("article");
       item.className =
-        `message-item urgency-${message.urgency}${message.unread ? " unread" : ""}`;
+        `message-item urgency-${message.urgency}` +
+        `${message.unread ? " unread" : ""}${message.image ? " has-image" : ""}`;
 
       const heading = document.createElement("div");
       heading.className = "message-heading";
@@ -149,6 +175,16 @@ Module.register("MMM-MessageCenter", {
         body.className = "message-body";
         body.textContent = message.body;
         item.appendChild(body);
+      }
+
+      if (message.image) {
+        const image = document.createElement("img");
+        image.className = "message-image";
+        image.src = message.image.dataUrl;
+        image.alt = message.image.alt;
+        image.loading = "eager";
+        image.decoding = "async";
+        item.appendChild(image);
       }
 
       const meta = document.createElement("div");
@@ -431,6 +467,10 @@ Module.register("MMM-MessageCenter", {
       : -1;
     if (duplicateIndex !== -1) {
       const duplicate = this.messages[duplicateIndex];
+      if (duplicate.timestamp > message.timestamp) {
+        Log.info(`[MMM-MessageCenter] Ignored stale update ${message.source}/${message.id}`);
+        return false;
+      }
       if (this.isEquivalentMessage(duplicate, message)) {
         Log.info(`[MMM-MessageCenter] Ignored duplicate ${message.source}/${message.id}`);
         return false;
@@ -441,6 +481,7 @@ Module.register("MMM-MessageCenter", {
 
     if (message.retention !== "ephemeral") {
       this.messages.unshift(message);
+      this.messages.sort((left, right) => right.timestamp - left.timestamp);
       this.messages = this.messages.slice(0, this.getMaxMessages());
       inboxChanged = true;
     }
@@ -926,6 +967,7 @@ Module.register("MMM-MessageCenter", {
       left.urgency === right.urgency &&
       left.retention === right.retention &&
       left.expires === right.expires &&
+      JSON.stringify(left.image) === JSON.stringify(right.image) &&
       JSON.stringify(left.actions) === JSON.stringify(right.actions)
     );
   },
@@ -958,6 +1000,7 @@ Module.register("MMM-MessageCenter", {
           : "archive";
     const priority = urgency === "passive" ? "ephemeral" : "attention";
     const actions = raw.actions && typeof raw.actions === "object" ? raw.actions : {};
+    const image = this.normalizeImage(raw.image);
 
     const hasExplicitId = raw.id !== undefined && raw.id !== null && raw.id !== "";
 
@@ -977,7 +1020,25 @@ Module.register("MMM-MessageCenter", {
       timestamp,
       unread: urgency !== "passive" && retention !== "ephemeral",
       expires,
-      actions
+      actions,
+      image
+    };
+  },
+
+  normalizeImage(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    if (
+      typeof raw.dataUrl !== "string" ||
+      !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(raw.dataUrl)
+    ) {
+      return null;
+    }
+    return {
+      dataUrl: raw.dataUrl,
+      alt: typeof raw.alt === "string" && raw.alt.trim()
+        ? raw.alt.trim().slice(0, 240)
+        : "Message snapshot",
+      capturedAt: Number.isFinite(raw.capturedAt) ? raw.capturedAt : null
     };
   }
 });
