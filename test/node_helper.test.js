@@ -100,7 +100,7 @@ test("invalid startup configuration falls back safely", () => {
     require("express").application.listen = originalListen;
   }
 
-  assert.deepEqual(listened, { port: 8787, host: "0.0.0.0" });
+  assert.deepEqual(listened, { port: 8787, host: "127.0.0.1" });
 });
 
 test("starts the configured transport bundle", () => {

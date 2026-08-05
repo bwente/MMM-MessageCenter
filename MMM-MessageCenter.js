@@ -4,6 +4,8 @@ Module.register("MMM-MessageCenter", {
   defaults: {
     ui: "messages",
     displayMode: "page",
+    maxVisibleMessages: null,
+    showControls: true,
     compactMaxMessages: 3,
     compactShowControls: false,
     pages: true,
@@ -53,7 +55,7 @@ Module.register("MMM-MessageCenter", {
       }
     },
     webhook: {
-      host: "0.0.0.0",
+      host: "127.0.0.1",
       port: 8787,
       token: ""
     },
@@ -74,6 +76,8 @@ Module.register("MMM-MessageCenter", {
     images: {
       enabled: false,
       maxBytes: 1024 * 1024,
+      maxCachedImages: 12,
+      maxTotalBytes: 12 * 1024 * 1024,
       timeout: 5000,
       allowPrivateHosts: false,
       allowHttp: false
@@ -265,8 +269,7 @@ Module.register("MMM-MessageCenter", {
     heading.appendChild(count);
     header.appendChild(heading);
 
-    const showControls =
-      this.getDisplayMode() !== "compact" || this.config.compactShowControls === true;
+    const showControls = this.shouldShowMessageControls();
     const controls = document.createElement("div");
     controls.className = "messages-controls";
 
@@ -307,16 +310,24 @@ Module.register("MMM-MessageCenter", {
   },
 
   getDisplayedMessages() {
-    if (this.getDisplayMode() !== "compact") return this.messages;
-    const limit =
+    const configuredLimit = Number.isInteger(this.config.maxVisibleMessages) &&
+      this.config.maxVisibleMessages > 0
+      ? this.config.maxVisibleMessages
+      : null;
+    if (configuredLimit === null && this.getDisplayMode() !== "compact") {
+      return this.messages;
+    }
+    const limit = configuredLimit || (
       Number.isInteger(this.config.compactMaxMessages) &&
       this.config.compactMaxMessages > 0
         ? this.config.compactMaxMessages
-        : this.defaults.compactMaxMessages;
+        : this.defaults.compactMaxMessages
+    );
     return this.messages.slice(0, limit);
   },
 
   shouldShowMessageControls() {
+    if (this.config.showControls === false) return false;
     return this.getDisplayMode() !== "compact" || this.config.compactShowControls === true;
   },
 
@@ -483,6 +494,7 @@ Module.register("MMM-MessageCenter", {
       this.messages.unshift(message);
       this.messages.sort((left, right) => right.timestamp - left.timestamp);
       this.messages = this.messages.slice(0, this.getMaxMessages());
+      this.pruneCachedImages();
       inboxChanged = true;
     }
     if (inboxChanged) this.publishAttention(previousAttentionState);
@@ -955,6 +967,54 @@ Module.register("MMM-MessageCenter", {
     return Number.isInteger(this.config.maxMessages) && this.config.maxMessages > 0
       ? this.config.maxMessages
       : this.defaults.maxMessages;
+  },
+
+  getImageCacheLimits() {
+    const configured = this.config.images && typeof this.config.images === "object"
+      ? this.config.images
+      : {};
+    return {
+      maxCachedImages: Number.isInteger(configured.maxCachedImages) &&
+        configured.maxCachedImages >= 0
+        ? configured.maxCachedImages
+        : this.defaults.images.maxCachedImages,
+      maxTotalBytes: Number.isInteger(configured.maxTotalBytes) &&
+        configured.maxTotalBytes >= 0
+        ? configured.maxTotalBytes
+        : this.defaults.images.maxTotalBytes
+    };
+  },
+
+  getCachedImageBytes(image) {
+    if (!image || typeof image.dataUrl !== "string") return 0;
+    const separator = image.dataUrl.indexOf(",");
+    if (separator === -1) return 0;
+    const encoded = image.dataUrl.slice(separator + 1);
+    const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.floor(encoded.length * 3 / 4) - padding);
+  },
+
+  pruneCachedImages() {
+    const { maxCachedImages, maxTotalBytes } = this.getImageCacheLimits();
+    let retainedCount = 0;
+    let retainedBytes = 0;
+    let removed = 0;
+
+    this.messages.forEach((message) => {
+      if (!message.image) return;
+      const imageBytes = this.getCachedImageBytes(message.image);
+      if (
+        retainedCount >= maxCachedImages ||
+        retainedBytes + imageBytes > maxTotalBytes
+      ) {
+        message.image = null;
+        removed += 1;
+        return;
+      }
+      retainedCount += 1;
+      retainedBytes += imageBytes;
+    });
+    return removed;
   },
 
   isEquivalentMessage(left, right) {

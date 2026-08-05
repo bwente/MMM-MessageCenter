@@ -28,3 +28,9 @@ All notable changes to MMM-MessageCenter are documented in this file.
   traffic and recursive MessageCenter events.
 - Image download limits, timeouts, signature checks, bounded redirects, and
   private-host/unencrypted-HTTP blocking by default.
+- Localhost-only webhook binding by default; LAN access now requires explicit
+  configuration.
+- Rolling image-cache limits preserve the newest 12 snapshots within a 12 MiB
+  decoded-byte budget while retaining older text history.
+- Non-touch presentation can hide all buttons and limit rendered messages
+  without deleting bounded queue history.

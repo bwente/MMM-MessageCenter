@@ -78,6 +78,33 @@ test("compact mode falls back safely for an invalid visible-message limit", () =
   assert.equal(module.getDisplayedMessages().length, definition.defaults.compactMaxMessages);
 });
 
+test("limits full-page rendering without changing retained history", () => {
+  const module = instance({ maxVisibleMessages: 2 });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
+
+  assert.deepEqual(module.getDisplayedMessages().map(({ id }) => id), ["one", "two"]);
+  assert.equal(module.messages.length, 3);
+});
+
+test("generic visible-message limit takes precedence in compact mode", () => {
+  const module = instance({
+    displayMode: "compact",
+    maxVisibleMessages: 1,
+    compactMaxMessages: 3
+  });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
+
+  assert.deepEqual(module.getDisplayedMessages().map(({ id }) => id), ["one"]);
+});
+
+test("supports non-touch presentation without removing the header", () => {
+  const page = instance({ showControls: false });
+  const compact = instance({ displayMode: "compact", compactShowControls: true });
+
+  assert.equal(page.shouldShowMessageControls(), false);
+  assert.equal(compact.shouldShowMessageControls(), true);
+});
+
 test("normalizes an attention message", () => {
   const module = instance();
   const message = module.normalizeMessage({
@@ -173,6 +200,61 @@ test("caps stored messages at maxMessages", () => {
     module.messages.map(({ title }) => title),
     ["Three", "Two"]
   );
+});
+
+test("keeps only the newest configured image count without removing history", () => {
+  const module = instance({
+    showToasts: false,
+    images: {
+      ...definition.defaults.images,
+      maxCachedImages: 2,
+      maxTotalBytes: 100
+    }
+  });
+  const image = (value) => ({
+    dataUrl: `data:image/png;base64,${Buffer.from(value).toString("base64")}`,
+    alt: "Snapshot"
+  });
+
+  module.receiveMessage({ id: "one", timestamp: 1, image: image("1111") });
+  module.receiveMessage({ id: "two", timestamp: 2, image: image("2222") });
+  module.receiveMessage({ id: "three", timestamp: 3, image: image("3333") });
+
+  assert.equal(module.messages.length, 3);
+  assert.deepEqual(module.messages.map(({ id }) => id), ["three", "two", "one"]);
+  assert.equal(module.messages[0].image !== null, true);
+  assert.equal(module.messages[1].image !== null, true);
+  assert.equal(module.messages[2].image, null);
+});
+
+test("releases oldest image data when the total-byte budget is reached", () => {
+  const module = instance({
+    showToasts: false,
+    images: {
+      ...definition.defaults.images,
+      maxCachedImages: 12,
+      maxTotalBytes: 7
+    }
+  });
+  const dataUrl = (value) => `data:image/png;base64,${Buffer.from(value).toString("base64")}`;
+
+  module.messages = [
+    { id: "new", image: { dataUrl: dataUrl("1111") } },
+    { id: "old", image: { dataUrl: dataUrl("2222") } }
+  ];
+
+  assert.equal(module.pruneCachedImages(), 1);
+  assert.equal(module.messages[0].image !== null, true);
+  assert.equal(module.messages[1].image, null);
+});
+
+test("falls back safely for invalid image-cache limits", () => {
+  const module = instance({ images: { maxCachedImages: -1, maxTotalBytes: -1 } });
+
+  assert.deepEqual(module.getImageCacheLimits(), {
+    maxCachedImages: 12,
+    maxTotalBytes: 12 * 1024 * 1024
+  });
 });
 
 test("explicit ephemeral messages toast without entering inbox history", () => {

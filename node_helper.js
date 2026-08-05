@@ -41,7 +41,7 @@ module.exports = NodeHelper.create({
     if (this.server) return;
     if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) rawConfig = {};
 
-    const host = typeof rawConfig.host === "string" ? rawConfig.host : "0.0.0.0";
+    const host = typeof rawConfig.host === "string" ? rawConfig.host : "127.0.0.1";
     const port = Number.isInteger(rawConfig.port) ? rawConfig.port : 8787;
     const token = typeof rawConfig.token === "string" ? rawConfig.token : "";
 

@@ -73,6 +73,8 @@ interactive browser installations. Other modules can always use `MC_ACK_ALL`,
   config: {
     ui: "messages",
     displayMode: "page",
+    maxVisibleMessages: null,
+    showControls: true,
     pages: true,
     legacyAttentionEvents: true,
     messagesPage: 4,
@@ -94,7 +96,7 @@ interactive browser installations. Other modules can always use `MC_ACK_ALL`,
       }
     },
     webhook: {
-      host: "0.0.0.0",
+      host: "127.0.0.1",
       port: 8787,
       token: ""
     },
@@ -115,6 +117,8 @@ interactive browser installations. Other modules can always use `MC_ACK_ALL`,
     images: {
       enabled: false,
       maxBytes: 1024 * 1024,
+      maxCachedImages: 12,
+      maxTotalBytes: 12 * 1024 * 1024,
       timeout: 5000,
       allowPrivateHosts: false,
       allowHttp: false
@@ -144,13 +148,15 @@ Place the module class on the corresponding MMM-pages page:
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
 | `displayMode` | string | `"page"` | Use `page` for the full inbox or `compact` for a normal MagicMirror region. |
+| `maxVisibleMessages` | integer or `null` | `null` | Render only the newest configured number without deleting retained history. A positive value overrides `compactMaxMessages` in either display mode. |
+| `showControls` | boolean | `true` | Show history and per-message buttons where the display mode allows them. Set to `false` for non-touch displays. |
 | `compactMaxMessages` | integer | `3` | Maximum newest messages rendered in compact mode; the underlying queue is unchanged. |
 | `compactShowControls` | boolean | `false` | Show condensed history buttons in compact mode. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
 | `legacyAttentionEvents` | boolean | `true` | Emit compatibility `ATTENTION_ON` and `ATTENTION_OFF` notifications. Structured attention state remains the preferred contract. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
 | `channelRoutes` | object | `{}` | Maps semantic channel names such as `weather` to MMM-pages indexes. The built-in `messages` route always uses `messagesPage`. |
-| `maxMessages` | integer | `50` | Maximum messages retained in browser memory. |
+| `maxMessages` | integer | `50` | Hard limit for all retained messages. Oldest history is displaced when the queue reaches this size. |
 | `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
 | `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
 | `showHeader` | boolean | `true` | Show the inbox title, explicit unread/total counts, and touch-friendly history controls. |
@@ -160,7 +166,7 @@ Place the module class on the corresponding MMM-pages page:
 | `internalNotifications.remoteControl.enabled` | boolean | `true` | Capture the calm default allowlist of user-facing MMM-Remote-Control notifications. |
 | `internalNotifications.remoteControl.mappings` | object | See below | Explicit allowlist and normalization policy for notifications emitted by MMM-Remote-Control. |
 | `internalNotifications.weather.enabled` | boolean | `false` | Convert eligible default-weather forecasts into MessageCenter alerts. |
-| `webhook.host` | string | `"0.0.0.0"` | Address on which the webhook listens. The default accepts devices on the local network. |
+| `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. The secure default accepts only software running on the mirror. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
 | `webhook.token` | string | `""` | Optional bearer token. When configured, every webhook request must provide it. |
 | `transports.mqtt.enabled` | boolean | `false` | Subscribe to MQTT messages using the existing MessageCenter schema. |
@@ -173,6 +179,8 @@ Place the module class on the corresponding MMM-pages page:
 | `transports.unixSocket.mode` | integer | `0o600` | Filesystem permissions applied to the socket. |
 | `images.enabled` | boolean | `false` | Fetch and preserve one remote image when a message enters through REST, MQTT, or the Unix socket. |
 | `images.maxBytes` | integer | `1048576` | Maximum downloaded snapshot size; accepted range is 1 KiB through 5 MiB. |
+| `images.maxCachedImages` | integer | `12` | Maximum newest snapshots retained. Older messages remain but release their image data. |
+| `images.maxTotalBytes` | integer | `12582912` | Maximum decoded bytes retained across all snapshots. The count and byte limits both apply. |
 | `images.timeout` | integer | `5000` | Image download timeout in milliseconds. |
 | `images.allowPrivateHosts` | boolean | `false` | Permit image hosts resolving to private or local addresses. Enable only for trusted camera networks. |
 | `images.allowHttp` | boolean | `false` | Permit unencrypted HTTP image URLs. HTTPS remains required by default. |
@@ -187,6 +195,25 @@ The inbox is background-agnostic and leaves its sticky header transparent by
 default. Themes that need an opaque header while scrolling can set the
 `--message-center-header-background` CSS custom property to the page background
 color in `custom.css`.
+
+### Non-touch presentation
+
+Buttons can be omitted while retaining automatic viewed-state behavior and the
+notification API used by other modules. `maxVisibleMessages` limits only the
+rendered newest entries; `maxMessages` remains the hard queue limit.
+
+```js
+{
+  module: "MMM-MessageCenter",
+  position: "middle_center",
+  config: {
+    displayMode: "page",
+    showControls: false,
+    maxVisibleMessages: 6,
+    clearAttentionWhenViewed: true
+  }
+}
+```
 
 ## MagicMirror internal notifications
 
@@ -305,7 +332,7 @@ It is an optional provider rather than a runtime requirement.
 The webhook accepts a JSON object at `POST /message`:
 
 ```sh
-curl http://MIRROR_ADDRESS:8787/message \
+curl http://127.0.0.1:8787/message \
   -H "Content-Type: application/json" \
   -d '{
     "source": "home-assistant",
@@ -318,9 +345,19 @@ curl http://MIRROR_ADDRESS:8787/message \
   }'
 ```
 
-The default configuration accepts requests from the local network without
-authentication for straightforward onboarding. Do not expose the webhook port
-directly to the public internet.
+The default configuration accepts requests only from software running on the
+mirror. To receive webhooks from Home Assistant or another LAN system, opt in
+to network access and preferably configure a strong token:
+
+```js
+webhook: {
+  host: "0.0.0.0",
+  port: 8787,
+  token: "GENERATE_A_STRONG_RANDOM_TOKEN"
+}
+```
+
+Do not expose the webhook port directly to the public internet.
 
 For permanent or less-trusted network installations, configure a strong token
 and include it with every request:
@@ -332,9 +369,9 @@ curl http://MIRROR_IP:8787/message \
   -d '{"title":"Test message"}'
 ```
 
-When `webhook.token` is empty, MessageCenter logs a warning at startup. Set
-`webhook.host` to `"127.0.0.1"` when only software running on the mirror should
-be able to submit messages.
+When a non-localhost webhook has no token, MessageCenter logs a startup warning.
+Existing installations that intentionally accept LAN requests should keep an
+explicit non-localhost `webhook.host` during upgrades.
 
 ### MQTT
 
@@ -417,7 +454,9 @@ response content type and file signature, follows at most three validated
 redirects, and does not pass the original URL to the browser. HTTPS and public
 hosts are required by default. Private hosts and HTTP each require a separate,
 explicit opt-in. Images remain in memory and disappear with message history or
-when MagicMirror restarts.
+when MagicMirror restarts. By default, the newest 12 images are retained within
+a 12 MiB decoded-byte budget. Reaching either limit releases image data from
+the oldest affected messages without deleting their text or history state.
 
 ## Message schema
 
