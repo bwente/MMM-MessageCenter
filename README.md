@@ -425,6 +425,13 @@ printf '%s\n' '{"id":"system-network","type":"system.network","source":"system-m
   | socat - UNIX-CONNECT:/tmp/mmm-messagecenter.sock
 ```
 
+For a novice-friendly starting point, [`examples/system-monitor.sh`](examples/system-monitor.sh)
+checks free storage, sends only when the warning state changes, and clears the
+active warning after recovery. It can be copied directly to the mirror and run
+from cron or a systemd timer. The script requires `socat` and defaults to a 10%
+free-space threshold; its path, threshold, socket, and state file can all be
+overridden with environment variables.
+
 MessageCenter supplies the transport, schema, and presentation. Disk, network,
 temperature, and service checks should remain separate monitoring scripts or
 services so the module stays hardware-independent.
