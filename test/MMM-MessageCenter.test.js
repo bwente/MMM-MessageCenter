@@ -1080,19 +1080,7 @@ test("can disable automatic page actions", () => {
   assert.equal(module.notifications.some(({ name }) => name === "PAGE_CHANGED"), false);
 });
 
-test("can disable Seymour attention notifications", () => {
-  const module = instance({ attention: "none", showToasts: false });
-
-  module.socketNotificationReceived("MC_MESSAGE", {
-    title: "Stored only",
-    priority: "attention"
-  });
-
-  assert.equal(module.unreadAttentionCount, 1);
-  assert.equal(module.notifications.some(({ name }) => name === "ATTENTION_ON"), false);
-});
-
-test("uses an integration-neutral switch for compatibility attention events", () => {
+test("can disable compatibility attention events", () => {
   const module = instance({ legacyAttentionEvents: false, showToasts: false });
 
   module.socketNotificationReceived("MC_MESSAGE", {

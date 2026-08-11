@@ -844,9 +844,6 @@ Module.register("MMM-MessageCenter", {
   },
 
   shouldPublishLegacyAttentionEvents() {
-    if (typeof this.config.attention === "string") {
-      return this.config.attention === "seymour";
-    }
     return this.config.legacyAttentionEvents !== false;
   },
 
