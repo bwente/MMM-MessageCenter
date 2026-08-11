@@ -311,6 +311,8 @@ refreshes do not repeat its toast or attention signal. A later hourly update
 without qualifying rain resolves the message and its attention state. As a
 safety net, the message expires 90 minutes after the matched forecast time.
 
+![Rain approaching weather alert in the MessageCenter inbox](docs/images/weather-alert.png)
+
 | Rain option | Default | Description |
 | --- | --- | --- |
 | `enabled` | `true` | Enable the rain rule when the weather provider is enabled. |
@@ -344,6 +346,11 @@ curl http://127.0.0.1:8787/message \
     "actions": { "switchChannel": "messages", "timeout": 10000 }
   }'
 ```
+
+Home Assistant messages share the same inbox and attention model, whether they
+contain a simple household update or a cached camera snapshot:
+
+![Home Assistant appliance and doorbell notifications in the MessageCenter inbox](docs/images/home-assistant-notifications.png)
 
 The default configuration accepts requests only from software running on the
 mirror. To receive webhooks from Home Assistant or another LAN system, opt in
