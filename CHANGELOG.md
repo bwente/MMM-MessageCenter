@@ -14,8 +14,7 @@ All notable changes to MMM-MessageCenter are documented in this file.
 - Optional ingestion-time image snapshots with full-page and compact presentation.
 - MagicMirror internal notification ingestion for weather and MMM-Remote-Control.
 - Toasts, semantic attention state, and optional MMM-pages channel routing.
-- Integration-neutral attention-event configuration with compatibility for the
-  former Seymour-named option.
+- Integration-neutral attention-event configuration for presentation adapters.
 - Inbox UI with urgency styling, read-state transitions, history controls, and
   MagicMirror locale and clock-format support.
 - Compact region-friendly presentation for standard MagicMirror layouts.

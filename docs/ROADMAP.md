@@ -7,9 +7,8 @@ job is to accept messages from many systems, apply consistent lifecycle and
 routing policy, and publish semantic state that any UI or hardware adapter may
 present.
 
-Seymour is the first appliance integration, not a requirement. A vanilla
-MagicMirror installation should be able to use the inbox and toast behavior with
-all hardware integrations disabled.
+A standard MagicMirror installation should be able to use the inbox and toast
+behavior with all optional hardware integrations disabled.
 
 ## Product boundary
 
@@ -32,8 +31,8 @@ MessageCenter does not own:
 - Home Assistant entity implementation;
 - the physical form or interaction model of a particular appliance.
 
-Those responsibilities belong to adapters such as MMM-Seymour, Home Assistant
-automations, camera providers, or future sound and desktop-notification modules.
+Those responsibilities belong to Home Assistant automations, camera providers,
+lighting adapters, or future sound and desktop-notification modules.
 
 ## Current message contract
 
@@ -163,7 +162,7 @@ credentials and transport details must not leak into the core schema.
 The built-in inbox and MagicMirror toast notification are the first presentation
 surfaces. Future adapters may include:
 
-- Seymour WLED status and attention patterns;
+- lighting status and attention patterns;
 - audio cues and spoken alerts;
 - screen-edge or full-screen critical effects;
 - desktop and mobile notifications;
@@ -185,7 +184,8 @@ producers merely to control hardware.
 - user navigation cancels automatic return (implemented);
 - built-in inbox with unread treatment and bulk acknowledgement (implemented);
 - compact region-friendly inbox presentation (implemented);
-- confirmed Home Assistant delivery on Seymour (implemented).
+- confirmed Home Assistant delivery on a physical MagicMirror installation
+  (implemented).
 
 ### Phase 2 — appliance UX and lifecycle
 
@@ -229,6 +229,7 @@ When evaluating roadmap work:
 3. Keep the message contract independent of hardware and page implementations.
 4. Prefer semantic state over device commands.
 5. Preserve backward compatibility or document an intentional migration.
-6. Validate changes on the physical Seymour display as well as in unit tests.
+6. Validate changes on representative physical MagicMirror displays as well as
+   in unit tests.
 7. Treat this roadmap as revisable evidence of direction, not a promise that
    every exploratory feature will ship.

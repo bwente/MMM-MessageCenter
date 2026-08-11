@@ -13,8 +13,8 @@ attention notifications, an optional inbox, and optional page routing through
 [MMM-pages](https://github.com/edward-shen/MMM-pages).
 
 MessageCenter does not control LEDs, speakers, GPIO, or other hardware. It
-publishes message and attention intent; integrations such as MMM-Seymour decide
-how that intent should be presented.
+publishes message and attention intent so any MagicMirror module or external
+integration can decide how that intent should be presented.
 
 ## Design principles
 
@@ -43,7 +43,7 @@ npm install --omit=dev
 ### Standard MagicMirror region
 
 Compact mode is designed for an ordinary MagicMirror region and does not
-require MMM-pages, Seymour, or any hardware integration:
+require MMM-pages or any hardware integration:
 
 ```js
 {
@@ -527,14 +527,10 @@ It also emits `MESSAGE_CENTER_ATTENTION_CHANGED` with `active`, `unreadCount`,
 structured event is the preferred contract for new integrations; the legacy
 events remain available for compatibility.
 
-These are ordinary MagicMirror notifications; MessageCenter does not control
-WLED or depend on a particular lighting implementation. MMM-Seymour may consume
-them as one attention source alongside Home Assistant, calendar, or other
-modules.
-
-The former `attention: "seymour"` setting remains supported for existing
-installations. New configurations should use the integration-neutral
-`legacyAttentionEvents` option.
+These are ordinary MagicMirror notifications. Any MagicMirror module may
+consume them as an attention source, and external integrations can translate
+the semantic state into lighting, sound, desktop notifications, or other
+presentation without coupling that behavior to MessageCenter.
 
 Potential senders include Home Assistant, calendars, cameras, doorbells,
 weather services, household appliances, custom webhooks, and other MagicMirror
