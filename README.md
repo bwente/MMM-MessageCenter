@@ -16,6 +16,13 @@ MessageCenter does not control LEDs, speakers, GPIO, or other hardware. It
 publishes message and attention intent so any MagicMirror module or external
 integration can decide how that intent should be presented.
 
+## Project status
+
+MMM-MessageCenter is released and ready for everyday use. Its core MagicMirror
+notification support requires no external service, account, API key, or special
+hardware. Home Assistant, MQTT, camera snapshots, and other integrations are
+optional and are configured separately by the user.
+
 ## Design principles
 
 - One normalized entry point for household notifications.
@@ -27,12 +34,23 @@ integration can decide how that intent should be presented.
 
 ## Installation
 
-From the MagicMirror `modules` directory:
+Install from the MagicMirror directory:
 
 ```sh
+cd ~/MagicMirror/modules
 git clone https://github.com/bwente/MMM-MessageCenter.git
 cd MMM-MessageCenter
-npm install --omit=dev
+npm ci --omit=dev
+```
+
+## Update
+
+Update an existing installation from the module directory:
+
+```sh
+cd ~/MagicMirror/modules/MMM-MessageCenter
+git pull
+npm ci --omit=dev
 ```
 
 ## Configuration
@@ -51,7 +69,7 @@ require MMM-pages or any hardware integration:
     compactMaxMessages: 3,
     pages: false
   }
-}
+},
 ```
 
 It shows the newest messages in a narrow region, uses time-only metadata, and
@@ -121,25 +139,13 @@ interactive browser installations. Other modules can always use `MC_ACK_ALL`,
       allowHttp: false
     }
   }
-}
+},
 ```
 
-Place the module class on the corresponding MMM-pages page:
-
-```js
-{
-  module: "MMM-pages",
-  config: {
-    modules: [
-      ["page-0"],
-      ["page-1"],
-      ["page-2"],
-      ["page-3"],
-      ["message-center-page"]
-    ]
-  }
-}
-```
+When using MMM-pages, add `"message-center-page"` to the desired page in that
+module's `modules` configuration. See the
+[MMM-pages configuration guide](https://github.com/edward-shen/MMM-pages#configuration)
+for its complete page layout syntax.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -209,7 +215,7 @@ rendered newest entries; `maxMessages` remains the hard queue limit.
     maxVisibleMessages: 6,
     clearAttentionWhenViewed: true
   }
-}
+},
 ```
 
 ## MagicMirror internal notifications
@@ -347,7 +353,7 @@ curl http://127.0.0.1:8787/message \
 Home Assistant messages share the same inbox and attention model, whether they
 contain a simple household update or a cached camera snapshot:
 
-![Home Assistant appliance and doorbell notifications in the MessageCenter inbox](docs/images/home-assistant-notifications.png)
+![Home Assistant appliance and doorbell notifications in the MessageCenter inbox](docs/images/screenshot-home-assistant-notifications.png)
 
 The default configuration accepts requests only from software running on the
 mirror. To receive webhooks from Home Assistant or another LAN system, opt in

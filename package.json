@@ -16,9 +16,12 @@
   "keywords": [
     "magicmirror",
     "notifications",
-    "home-assistant"
+    "home-assistant",
+    "mqtt",
+    "smart-home"
   ],
   "scripts": {
+    "lint": "eslint",
     "test": "node --test"
   },
   "engines": {
@@ -27,5 +30,8 @@
   "dependencies": {
     "express": "^5.1.0",
     "mqtt": "^5.15.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
   }
 }
