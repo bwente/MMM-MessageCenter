@@ -25,9 +25,6 @@ integration can decide how that intent should be presented.
 - Calm interactions that do not fight manual navigation.
 - A stable core message schema that can gain providers and presentation adapters.
 
-See the [living product roadmap](docs/ROADMAP.md) for the boundary between
-current behavior, near-term work, and exploratory ideas.
-
 ## Installation
 
 From the MagicMirror `modules` directory:
