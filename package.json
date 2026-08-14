@@ -32,6 +32,6 @@
     "mqtt": "^5.15.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.5"
+    "eslint": "^10.8.1"
   }
 }
