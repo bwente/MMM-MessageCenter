@@ -16,6 +16,8 @@ MessageCenter does not control LEDs, speakers, GPIO, or other hardware. It
 publishes message and attention intent so any MagicMirror module or external
 integration can decide how that intent should be presented.
 
+![Home Assistant appliance and doorbell notifications in the MessageCenter inbox](docs/images/screenshot-home-assistant-notifications.png)
+
 ## Project status
 
 MMM-MessageCenter is released and ready for everyday use. Its core MagicMirror
@@ -351,9 +353,7 @@ curl http://127.0.0.1:8787/message \
 ```
 
 Home Assistant messages share the same inbox and attention model, whether they
-contain a simple household update or a cached camera snapshot:
-
-![Home Assistant appliance and doorbell notifications in the MessageCenter inbox](docs/images/screenshot-home-assistant-notifications.png)
+contain a simple household update or a cached camera snapshot.
 
 The default configuration accepts requests only from software running on the
 mirror. To receive webhooks from Home Assistant or another LAN system, opt in
