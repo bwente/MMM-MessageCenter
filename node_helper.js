@@ -272,7 +272,7 @@ module.exports = NodeHelper.create({
     let payload;
     try {
       payload = JSON.parse(Buffer.isBuffer(value) ? value.toString("utf8") : String(value));
-    } catch (_error) {
+    } catch {
       this.sendSocketNotification("MC_ERROR", `Invalid JSON payload from ${transport}`);
       return false;
     }

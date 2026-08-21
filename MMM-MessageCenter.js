@@ -363,7 +363,7 @@ Module.register("MMM-MessageCenter", {
         new Intl.DateTimeFormat(candidate);
         locale = candidate;
         break;
-      } catch (_error) {
+      } catch {
         // Try the next configured preference, then the browser default.
       }
     }
@@ -410,7 +410,7 @@ Module.register("MMM-MessageCenter", {
 
     try {
       return new Intl.DateTimeFormat(locale, options).format(date);
-    } catch (_error) {
+    } catch {
       return includeDate ? date.toLocaleString() : date.toLocaleTimeString();
     }
   },
