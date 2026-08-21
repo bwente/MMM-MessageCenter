@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Hardware-independent notification and attention hub for MagicMirror²",
   "private": true,
+  "type": "commonjs",
   "author": "Brian Wente",
   "license": "MIT",
   "repository": {
@@ -25,13 +26,13 @@
     "test": "node --test"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.21.1 <23 || >=24"
   },
   "dependencies": {
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "mqtt": "^5.15.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.5"
+    "eslint": "^10.8.1"
   }
 }
