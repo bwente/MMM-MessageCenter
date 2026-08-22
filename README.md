@@ -69,7 +69,7 @@ and time. It does not require MMM-pages or any hardware integration:
   position: "top_right",
   config: {
     displayMode: "line",
-    lineMaxMessages: 3,
+    maxVisibleMessages: 3,
     lineShowBody: false,
     pages: false
   }
@@ -82,9 +82,9 @@ bounded queue remains available internally, and other modules can still use
 `MC_ACK_ALL`, `MC_CLEAR_READ`, and `MC_CLEAR_ALL`.
 
 Use `displayMode: "compact"` when the region should show small cards with body
-text, source labels, and image thumbnails. Compact mode also defaults to three
-visible messages through `compactMaxMessages`. Its history buttons remain
-hidden unless `compactShowControls: true` is configured.
+text, source labels, and image thumbnails. The same `maxVisibleMessages` option
+sets the visible count in compact mode. Its history buttons remain hidden unless
+`compactShowControls: true` is configured.
 
 ### Full-page inbox
 
@@ -159,11 +159,9 @@ for its complete page layout syntax.
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
 | `displayMode` | string | `"page"` | Use `page` for the full inbox, `compact` for small cards, or `line` for a minimal standard MagicMirror region. |
-| `maxVisibleMessages` | integer or `null` | `null` | Render only the newest configured number without deleting retained history. A positive value overrides the mode-specific limit. |
+| `maxVisibleMessages` | integer or `null` | `null` | Render only the newest configured number without deleting retained history. Region modes show three messages when this is `null`. |
 | `showControls` | boolean | `true` | Show history and per-message buttons where the display mode allows them. Set to `false` for non-touch displays. |
-| `compactMaxMessages` | integer | `3` | Maximum newest messages rendered in compact mode; the underlying queue is unchanged. |
 | `compactShowControls` | boolean | `false` | Show condensed history buttons in compact mode. |
-| `lineMaxMessages` | integer | `3` | Maximum newest messages rendered in line mode; the underlying queue is unchanged. |
 | `lineShowBody` | boolean | `false` | Add one truncated body line beneath each line-mode title. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
 | `legacyAttentionEvents` | boolean | `true` | Emit compatibility `ATTENTION_ON` and `ATTENTION_OFF` notifications. Structured attention state remains the preferred contract. |
@@ -199,6 +197,9 @@ for its complete page layout syntax.
 | `images.allowHttp` | boolean | `false` | Permit unencrypted HTTP image URLs. HTTPS remains required by default. |
 
 Messages are stored only in memory and reset when MagicMirror restarts.
+`compactMaxMessages` and `lineMaxMessages` remain supported for compatibility
+with earlier configurations, but new installations should use the universal
+`maxVisibleMessages` option.
 Inbox timestamps and newly generated weather-alert times follow MagicMirror's
 global `timeFormat` (`12` or `24`) and `locale`/`language` preferences. Changing
 those preferences reformats rendered metadata; it does not rewrite historical
