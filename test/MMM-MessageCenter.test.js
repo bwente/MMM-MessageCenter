@@ -106,15 +106,23 @@ test("limits full-page rendering without changing retained history", () => {
   assert.equal(module.messages.length, 3);
 });
 
-test("generic visible-message limit takes precedence in compact mode", () => {
-  const module = instance({
+test("universal visible-message limit takes precedence in region modes", () => {
+  const compact = instance({
     displayMode: "compact",
     maxVisibleMessages: 1,
     compactMaxMessages: 3
   });
-  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
+  const line = instance({
+    displayMode: "line",
+    maxVisibleMessages: 2,
+    lineMaxMessages: 3
+  });
+  const messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
+  compact.messages = messages;
+  line.messages = messages;
 
-  assert.deepEqual(module.getDisplayedMessages().map(({ id }) => id), ["one"]);
+  assert.deepEqual(compact.getDisplayedMessages().map(({ id }) => id), ["one"]);
+  assert.deepEqual(line.getDisplayedMessages().map(({ id }) => id), ["one", "two"]);
 });
 
 test("supports non-touch presentation without removing the header", () => {

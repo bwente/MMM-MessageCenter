@@ -7,8 +7,10 @@ All notable changes to MMM-MessageCenter are documented in this file.
 ### Added
 
 - Transparent line display mode for narrow standard MagicMirror regions, with
-  priority edges, time-only metadata, a three-message default, and optional
-  single-line body text.
+  priority edges, time-only metadata, a three-message default through the
+  universal `maxVisibleMessages` setting, and optional single-line body text.
+- Simplified region configuration documentation around `maxVisibleMessages`;
+  older mode-specific limits remain supported for compatibility.
 
 ## 0.1.0 - 2026-08-01
 
