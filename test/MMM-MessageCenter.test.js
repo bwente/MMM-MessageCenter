@@ -78,6 +78,26 @@ test("compact mode falls back safely for an invalid visible-message limit", () =
   assert.equal(module.getDisplayedMessages().length, definition.defaults.compactMaxMessages);
 });
 
+test("line mode limits visible history with its own safe default", () => {
+  const module = instance({ displayMode: "line", lineMaxMessages: 0 });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }, { id: "four" }];
+
+  assert.equal(module.getDisplayMode(), "line");
+  assert.deepEqual(
+    module.getDisplayedMessages().map(({ id }) => id),
+    ["one", "two", "three"]
+  );
+  assert.equal(module.messages.length, 4);
+});
+
+test("invalid display modes fall back to the full page", () => {
+  const module = instance({ displayMode: "tiny" });
+  module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }, { id: "four" }];
+
+  assert.equal(module.getDisplayMode(), "page");
+  assert.equal(module.getDisplayedMessages().length, 4);
+});
+
 test("limits full-page rendering without changing retained history", () => {
   const module = instance({ maxVisibleMessages: 2 });
   module.messages = [{ id: "one" }, { id: "two" }, { id: "three" }];
@@ -100,9 +120,21 @@ test("generic visible-message limit takes precedence in compact mode", () => {
 test("supports non-touch presentation without removing the header", () => {
   const page = instance({ showControls: false });
   const compact = instance({ displayMode: "compact", compactShowControls: true });
+  const line = instance({ displayMode: "line" });
 
   assert.equal(page.shouldShowMessageControls(), false);
   assert.equal(compact.shouldShowMessageControls(), true);
+  assert.equal(line.shouldShowMessageControls(), false);
+});
+
+test("line mode shows optional body text but never images", () => {
+  const titlesOnly = instance({ displayMode: "line" });
+  const withBody = instance({ displayMode: "line", lineShowBody: true });
+
+  assert.equal(titlesOnly.shouldShowMessageBody(), false);
+  assert.equal(withBody.shouldShowMessageBody(), true);
+  assert.equal(withBody.shouldShowMessageImage(), false);
+  assert.equal(instance({ displayMode: "compact" }).shouldShowMessageImage(), true);
 });
 
 test("normalizes an attention message", () => {
@@ -452,12 +484,14 @@ test("formats timestamps using MagicMirror 24-hour preferences", () => {
   });
 });
 
-test("compact mode uses a time-only metadata timestamp", () => {
+test("compact and line modes use a time-only metadata timestamp", () => {
   const module = instance({ displayMode: "compact" });
+  const line = instance({ displayMode: "line" });
   const date = new Date(2026, 6, 23, 14, 5, 6);
 
   withGlobalConfig({ timeFormat: 12, locale: "en-US" }, () => {
     assert.match(module.formatDisplayedTimestamp(date), /^2:05\s*PM$/i);
+    assert.match(line.formatDisplayedTimestamp(date), /^2:05\s*PM$/i);
   });
 });
 

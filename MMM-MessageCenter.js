@@ -8,6 +8,8 @@ Module.register("MMM-MessageCenter", {
     showControls: true,
     compactMaxMessages: 3,
     compactShowControls: false,
+    lineMaxMessages: 3,
+    lineShowBody: false,
     pages: true,
     legacyAttentionEvents: true,
     messagesPage: 4,
@@ -140,7 +142,7 @@ Module.register("MMM-MessageCenter", {
       emptyTitle.textContent = "You’re all caught up";
       empty.appendChild(emptyTitle);
 
-      if (this.getDisplayMode() !== "compact") {
+      if (this.getDisplayMode() === "page") {
         const emptyDetail = document.createElement("p");
         emptyDetail.className = "messages-empty-detail";
         emptyDetail.textContent = "New household messages will appear here.";
@@ -174,14 +176,14 @@ Module.register("MMM-MessageCenter", {
 
       item.appendChild(heading);
 
-      if (message.body) {
+      if (message.body && this.shouldShowMessageBody()) {
         const body = document.createElement("p");
         body.className = "message-body";
         body.textContent = message.body;
         item.appendChild(body);
       }
 
-      if (message.image) {
+      if (message.image && this.shouldShowMessageImage()) {
         const image = document.createElement("img");
         image.className = "message-image";
         image.src = message.image.dataUrl;
@@ -306,7 +308,9 @@ Module.register("MMM-MessageCenter", {
   },
 
   getDisplayMode() {
-    return this.config.displayMode === "compact" ? "compact" : "page";
+    return ["page", "compact", "line"].includes(this.config.displayMode)
+      ? this.config.displayMode
+      : "page";
   },
 
   getDisplayedMessages() {
@@ -314,21 +318,36 @@ Module.register("MMM-MessageCenter", {
       this.config.maxVisibleMessages > 0
       ? this.config.maxVisibleMessages
       : null;
-    if (configuredLimit === null && this.getDisplayMode() !== "compact") {
+    const displayMode = this.getDisplayMode();
+    if (configuredLimit === null && displayMode === "page") {
       return this.messages;
     }
-    const limit = configuredLimit || (
-      Number.isInteger(this.config.compactMaxMessages) &&
-      this.config.compactMaxMessages > 0
-        ? this.config.compactMaxMessages
-        : this.defaults.compactMaxMessages
-    );
+    const modeLimit = displayMode === "line"
+      ? this.getPositiveIntegerConfig("lineMaxMessages")
+      : this.getPositiveIntegerConfig("compactMaxMessages");
+    const limit = configuredLimit || modeLimit;
     return this.messages.slice(0, limit);
+  },
+
+  getPositiveIntegerConfig(name) {
+    return Number.isInteger(this.config[name]) && this.config[name] > 0
+      ? this.config[name]
+      : this.defaults[name];
   },
 
   shouldShowMessageControls() {
     if (this.config.showControls === false) return false;
-    return this.getDisplayMode() !== "compact" || this.config.compactShowControls === true;
+    const displayMode = this.getDisplayMode();
+    if (displayMode === "line") return false;
+    return displayMode !== "compact" || this.config.compactShowControls === true;
+  },
+
+  shouldShowMessageBody() {
+    return this.getDisplayMode() !== "line" || this.config.lineShowBody === true;
+  },
+
+  shouldShowMessageImage() {
+    return this.getDisplayMode() !== "line";
   },
 
   getMessageSourceLabel(source) {
@@ -380,7 +399,7 @@ Module.register("MMM-MessageCenter", {
   },
 
   formatDisplayedTimestamp(value) {
-    return this.getDisplayMode() === "compact"
+    return this.getDisplayMode() !== "page"
       ? this.formatClockTime(value)
       : this.formatMessageTimestamp(value);
   },

@@ -59,26 +59,32 @@ npm ci --omit=dev
 
 ### Standard MagicMirror region
 
-Compact mode is designed for an ordinary MagicMirror region and does not
-require MMM-pages or any hardware integration:
+Line mode is the calmest fit for an ordinary MagicMirror region. It shows the
+newest three messages as transparent single rows with a priority edge, title,
+and time. It does not require MMM-pages or any hardware integration:
 
 ```js
 {
   module: "MMM-MessageCenter",
   position: "top_right",
   config: {
-    displayMode: "compact",
-    compactMaxMessages: 3,
+    displayMode: "line",
+    lineMaxMessages: 3,
+    lineShowBody: false,
     pages: false
   }
 },
 ```
 
-It shows the newest messages in a narrow region, uses time-only metadata, and
-keeps the complete bounded queue available internally. History buttons are
-hidden by default in compact mode; set `compactShowControls: true` for touch or
-interactive browser installations. Other modules can always use `MC_ACK_ALL`,
-`MC_CLEAR_READ`, and `MC_CLEAR_ALL`.
+Set `lineShowBody: true` to add one truncated body line below each title. Line
+mode intentionally omits images, source labels, and controls. The complete
+bounded queue remains available internally, and other modules can still use
+`MC_ACK_ALL`, `MC_CLEAR_READ`, and `MC_CLEAR_ALL`.
+
+Use `displayMode: "compact"` when the region should show small cards with body
+text, source labels, and image thumbnails. Compact mode also defaults to three
+visible messages through `compactMaxMessages`. Its history buttons remain
+hidden unless `compactShowControls: true` is configured.
 
 ### Full-page inbox
 
@@ -152,11 +158,13 @@ for its complete page layout syntax.
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `ui` | string | `"messages"` | Render the inbox when set to `messages`; other values keep it hidden. |
-| `displayMode` | string | `"page"` | Use `page` for the full inbox or `compact` for a normal MagicMirror region. |
-| `maxVisibleMessages` | integer or `null` | `null` | Render only the newest configured number without deleting retained history. A positive value overrides `compactMaxMessages` in either display mode. |
+| `displayMode` | string | `"page"` | Use `page` for the full inbox, `compact` for small cards, or `line` for a minimal standard MagicMirror region. |
+| `maxVisibleMessages` | integer or `null` | `null` | Render only the newest configured number without deleting retained history. A positive value overrides the mode-specific limit. |
 | `showControls` | boolean | `true` | Show history and per-message buttons where the display mode allows them. Set to `false` for non-touch displays. |
 | `compactMaxMessages` | integer | `3` | Maximum newest messages rendered in compact mode; the underlying queue is unchanged. |
 | `compactShowControls` | boolean | `false` | Show condensed history buttons in compact mode. |
+| `lineMaxMessages` | integer | `3` | Maximum newest messages rendered in line mode; the underlying queue is unchanged. |
+| `lineShowBody` | boolean | `false` | Add one truncated body line beneath each line-mode title. |
 | `pages` | boolean | `true` | Allow validated message actions to switch MMM-pages pages. |
 | `legacyAttentionEvents` | boolean | `true` | Emit compatibility `ATTENTION_ON` and `ATTENTION_OFF` notifications. Structured attention state remains the preferred contract. |
 | `messagesPage` | integer | `4` | Zero-based MMM-pages index containing the inbox. |
@@ -196,10 +204,17 @@ global `timeFormat` (`12` or `24`) and `locale`/`language` preferences. Changing
 those preferences reformats rendered metadata; it does not rewrite historical
 message body text that was generated earlier.
 
-The inbox is background-agnostic and leaves its sticky header transparent by
-default. Themes that need an opaque header while scrolling can set the
-`--message-center-header-background` CSS custom property to the page background
-color in `custom.css`.
+The inbox is background-agnostic. Line mode is transparent by default; themes
+that need extra contrast can set `--message-center-line-background`. Themes
+that need an opaque full-page header while scrolling can set
+`--message-center-header-background`:
+
+```css
+.MMM-MessageCenter {
+  --message-center-line-background: rgba(0, 0, 0, 0.35);
+  --message-center-header-background: #000;
+}
+```
 
 ### Non-touch presentation
 
