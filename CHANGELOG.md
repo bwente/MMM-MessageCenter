@@ -2,6 +2,15 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
+## Unreleased
+
+### Documentation
+
+- Added a contributor and release-verification checklist covering focused
+  changes, translations, metadata, sensitive-data review, clean-clone
+  installation, screenshot privacy, tested versions, and CI requirements.
+- Made `npm run check` the documented local development baseline.
+
 ## 0.3.0 - 2026-08-22
 
 ### Added
