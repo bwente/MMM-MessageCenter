@@ -313,6 +313,122 @@
   font-size: 0.9rem;
 }
 
+.messages-wrapper.messages-line {
+  width: min(360px, 100%);
+  margin-inline: 0;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  background: var(--message-center-line-background, transparent);
+  font-size: 0.9rem;
+}
+
+.messages-line .messages-header {
+  position: static;
+  padding: 0 0 0.35rem;
+  background: none;
+}
+
+.messages-line .messages-heading {
+  gap: 0.45rem;
+}
+
+.messages-line .messages-title {
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.messages-line .messages-count {
+  padding: 0.08rem 0.35rem;
+  font-size: 0.62rem;
+}
+
+.messages-line .message-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.08rem 0.65rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.22rem 0.4rem 0.22rem 0.55rem;
+  border: 0;
+  border-left: 3px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  background: transparent;
+}
+
+.messages-line .message-item + .message-item {
+  margin-top: 0.12rem;
+}
+
+.messages-line .message-item.unread {
+  background: transparent;
+}
+
+.messages-line .message-item.urgency-attention {
+  border-left-color: rgba(255, 190, 72, 0.58);
+}
+
+.messages-line .message-item.urgency-attention.unread {
+  border-left-color: rgba(255, 190, 72, 0.95);
+}
+
+.messages-line .message-item.urgency-critical {
+  border-left-color: rgba(255, 92, 92, 0.68);
+}
+
+.messages-line .message-item.urgency-critical.unread {
+  border-left-color: rgba(255, 92, 92, 0.98);
+  background: transparent;
+}
+
+.messages-line .message-heading {
+  min-width: 0;
+}
+
+.messages-line .message-title {
+  overflow: hidden;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages-line .message-unread-indicator,
+.messages-line .message-image,
+.messages-line .message-source {
+  display: none;
+}
+
+.messages-line .message-body {
+  display: block;
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  opacity: 0.62;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages-line .message-meta {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.58;
+}
+
+.messages-line .messages-empty {
+  padding: 0.5rem 0;
+  text-align: left;
+}
+
+.messages-line .messages-empty-title {
+  font-size: 0.82rem;
+}
+
 @media (max-height: 640px) {
   .messages-wrapper {
     max-height: calc(100vh - 48px);

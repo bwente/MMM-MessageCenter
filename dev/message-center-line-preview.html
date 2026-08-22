@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MMM-MessageCenter line mode preview</title>
+    <link rel="stylesheet" href="../MMM-MessageCenter.css">
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        width: 1280px;
+        height: 720px;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        color: #fff;
+        font-family: "Roboto Condensed", "Arial Narrow", sans-serif;
+      }
+      .preview-stage {
+        display: flex;
+        justify-content: flex-end;
+        padding: 48px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-stage">
+      <section class="messages-wrapper messages-line" aria-label="Message center">
+        <header class="messages-header">
+          <div class="messages-heading">
+            <h2 class="messages-title">Messages</h2>
+            <span class="messages-count has-unread">2 new · 3 total</span>
+          </div>
+        </header>
+
+        <article class="message-item urgency-critical unread">
+          <div class="message-heading">
+            <h3 class="message-title">Someone is at the door</h3>
+          </div>
+          <div class="message-meta"><time class="message-time">9:17 AM</time></div>
+        </article>
+
+        <article class="message-item urgency-attention unread">
+          <div class="message-heading">
+            <h3 class="message-title">Rain approaching</h3>
+          </div>
+          <div class="message-meta"><time class="message-time">9:12 AM</time></div>
+        </article>
+
+        <article class="message-item urgency-passive">
+          <div class="message-heading">
+            <h3 class="message-title">Dishwasher finished</h3>
+          </div>
+          <div class="message-meta"><time class="message-time">8:48 AM</time></div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
