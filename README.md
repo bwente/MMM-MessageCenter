@@ -597,12 +597,15 @@ creating independent alert experiences.
 ## Development
 
 ```sh
-npm test
+npm run check
 ```
 
 Open `dev/message-center-preview.html` in a browser to review a representative
 five-message inbox inside a fixed 1024x600 stage without sending live household
 events.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete change and release
+verification checklist.
 
 ## License
 
