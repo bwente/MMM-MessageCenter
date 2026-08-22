@@ -2,7 +2,7 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
-## Unreleased
+## 0.2.0 - 2026-08-22
 
 ### Added
 
@@ -11,6 +11,17 @@ All notable changes to MMM-MessageCenter are documented in this file.
   universal `maxVisibleMessages` setting, and optional single-line body text.
 - Simplified region configuration documentation around `maxVisibleMessages`;
   older mode-specific limits remain supported for compatibility.
+- Copy-and-paste local system-monitor example for storage, memory, load, and
+  service-health alerts through the Unix socket or localhost webhook.
+
+### Changed
+
+- Aligned the supported Node.js range, Express, ESLint, and CI matrix with the
+  current MagicMirror² toolchain.
+- Reworked the README and wiki around standard MagicMirror installations,
+  clearer onboarding examples, and prominent real-world screenshots.
+- Removed the speculative roadmap so published documentation describes only
+  implemented behavior.
 
 ## 0.1.0 - 2026-08-01
 
