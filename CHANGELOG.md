@@ -2,6 +2,26 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
+## 0.3.0 - 2026-08-22
+
+### Added
+
+- MagicMirror-native interface translations with a complete English fallback
+  plus German, Spanish, and French language files.
+- Translation coverage for interface and accessibility labels, friendly source
+  names, the Remote Control fallback title, and generated rain-alert text while
+  preserving sender-authored message titles and bodies.
+- Translation key and interpolation-variable parity tests, rendered coverage
+  for line, compact, and full-page modes, and standalone operation without
+  MMM-pages or companion hardware integrations.
+- A single `npm run check` entry point for lint and the complete test suite.
+
+### Changed
+
+- Set the compatibility baseline to MagicMirror² 2.37.0 and its supported
+  Node.js range: 22.21.1 or newer in the Node 22 series, or Node 24 and newer.
+- Updated CI to run the same project check used for local release validation.
+
 ## 0.2.0 - 2026-08-22
 
 ### Added

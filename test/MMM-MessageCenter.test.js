@@ -1,5 +1,16 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const translations = require("../translations/en.json");
+const germanTranslations = require("../translations/de.json");
+
+function createTranslator(dictionary) {
+  return (key, variables = {}) => Object.entries(variables).reduce(
+    (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
+    dictionary[key] || translations[key] || key
+  );
+}
+
+const translate = createTranslator(translations);
 
 let definition;
 global.Module = {
@@ -14,6 +25,7 @@ require("../MMM-MessageCenter.js");
 
 function instance(config = {}) {
   const notifications = [];
+  const socketNotifications = [];
   return {
     ...definition,
     config: {
@@ -30,11 +42,15 @@ function instance(config = {}) {
     expirationTimer: null,
     pendingView: null,
     notifications,
+    socketNotifications,
+    translate,
     updateDom() {},
     sendNotification(name, payload) {
       notifications.push({ name, payload });
     },
-    sendSocketNotification() {}
+    sendSocketNotification(name, payload) {
+      socketNotifications.push({ name, payload });
+    }
   };
 }
 
@@ -50,8 +66,71 @@ function withGlobalConfig(value, callback) {
   }
 }
 
+class FakeElement {
+  constructor(tagName) {
+    this.tagName = tagName.toUpperCase();
+    this.children = [];
+    this.childNodes = this.children;
+    this.attributes = {};
+    this.className = "";
+    this.textContent = "";
+    this.classList = {
+      add: (...names) => {
+        const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+        for (const name of names) classes.add(name);
+        this.className = [...classes].join(" ");
+      }
+    };
+  }
+
+  appendChild(child) {
+    this.children.push(child);
+    return child;
+  }
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  addEventListener() {}
+}
+
+function withFakeDocument(callback) {
+  const previous = global.document;
+  global.document = { createElement: (tagName) => new FakeElement(tagName) };
+  try {
+    return callback();
+  } finally {
+    if (previous === undefined) delete global.document;
+    else global.document = previous;
+  }
+}
+
+function elementsByClass(root, className) {
+  const matches = [];
+  const visit = (element) => {
+    if (element.className.split(/\s+/).includes(className)) matches.push(element);
+    for (const child of element.children) visit(child);
+  };
+  visit(root);
+  return matches;
+}
+
 test("defaults the message center to page four", () => {
   assert.equal(definition.defaults.messagesPage, 4);
+});
+
+test("provides the complete English translation entry point", () => {
+  assert.deepEqual(definition.getTranslations(), {
+    de: "translations/de.json",
+    en: "translations/en.json",
+    es: "translations/es.json",
+    fr: "translations/fr.json"
+  });
+  for (const key of ["MESSAGE_CENTER", "MARK_READ", "RAIN_APPROACHING", "SOURCE_WEATHER"]) {
+    assert.equal(typeof translations[key], "string");
+    assert.notEqual(translations[key], "");
+  }
 });
 
 test("defaults to the full page display mode", () => {
@@ -143,6 +222,102 @@ test("line mode shows optional body text but never images", () => {
   assert.equal(withBody.shouldShowMessageBody(), true);
   assert.equal(withBody.shouldShowMessageImage(), false);
   assert.equal(instance({ displayMode: "compact" }).shouldShowMessageImage(), true);
+});
+
+test("runs in a standard region without MMM-pages or companion integrations", () => {
+  const module = instance({
+    displayMode: "line",
+    pages: false,
+    expirationSweepInterval: 0,
+    internalNotifications: { enabled: false }
+  });
+
+  module.start();
+  module.socketNotificationReceived("MC_MESSAGE", {
+    title: "Standalone message",
+    body: "No companion module is required.",
+    actions: { switchChannel: "messages" }
+  });
+  const dom = withFakeDocument(() => module.getDom());
+  module.stop();
+
+  assert.equal(elementsByClass(dom, "message-title")[0].textContent, "Standalone message");
+  assert.equal(module.notifications.some(({ name }) => name === "PAGE_CHANGED"), false);
+  assert.equal(module.socketNotifications[0].name, "MC_START");
+  assert.equal(module.socketNotifications.at(-1).name, "MC_STOP");
+});
+
+test("renders standard-region line mode as translated title-and-time rows", () => {
+  const module = instance({ displayMode: "line", maxVisibleMessages: 2 });
+  module.translate = createTranslator(germanTranslations);
+  module.messages = [
+    module.normalizeMessage({
+      id: "one",
+      title: "Garage Door",
+      body: "The garage door is open.",
+      source: "home-assistant",
+      urgency: "attention",
+      retention: "untilViewed"
+    }),
+    module.normalizeMessage({ id: "two", title: "Dishwasher", body: "Cycle complete." }),
+    module.normalizeMessage({ id: "three", title: "Hidden by limit" })
+  ];
+
+  const dom = withFakeDocument(() => module.getDom());
+
+  assert.match(dom.className, /messages-line/);
+  assert.equal(elementsByClass(dom, "message-item").length, 2);
+  assert.deepEqual(
+    elementsByClass(dom, "message-title").map(({ textContent }) => textContent),
+    ["Garage Door", "Dishwasher"]
+  );
+  assert.equal(elementsByClass(dom, "message-body").length, 0);
+  assert.equal(elementsByClass(dom, "message-image").length, 0);
+  assert.equal(elementsByClass(dom, "message-controls").length, 0);
+  assert.equal(elementsByClass(dom, "messages-title")[0].textContent, "Nachrichten");
+});
+
+test("renders compact mode with message content and source but no default controls", () => {
+  const module = instance({ displayMode: "compact" });
+  module.messages = [module.normalizeMessage({
+    title: "User-authored title",
+    body: "User-authored body",
+    source: "magicmirror.weather",
+    image: {
+      dataUrl: `data:image/png;base64,${Buffer.from("image").toString("base64")}`,
+      alt: "Snapshot"
+    }
+  })];
+
+  const dom = withFakeDocument(() => module.getDom());
+
+  assert.match(dom.className, /messages-compact/);
+  assert.equal(elementsByClass(dom, "message-body")[0].textContent, "User-authored body");
+  assert.equal(elementsByClass(dom, "message-source")[0].textContent, "Weather");
+  assert.equal(elementsByClass(dom, "message-image").length, 1);
+  assert.equal(elementsByClass(dom, "message-controls").length, 0);
+});
+
+test("renders the full-page translated UI without translating sender content", () => {
+  const module = instance({ displayMode: "page" });
+  module.translate = createTranslator(germanTranslations);
+  module.messages = [module.normalizeMessage({
+    id: "door",
+    title: "Someone is at the door",
+    body: "Doorbell motion was detected.",
+    source: "home-assistant",
+    urgency: "attention",
+    retention: "untilViewed"
+  })];
+
+  const dom = withFakeDocument(() => module.getDom());
+
+  assert.match(dom.className, /messages-page/);
+  assert.equal(elementsByClass(dom, "messages-title")[0].textContent, "Nachrichten");
+  assert.equal(elementsByClass(dom, "message-title")[0].textContent, "Someone is at the door");
+  assert.equal(elementsByClass(dom, "message-body")[0].textContent, "Doorbell motion was detected.");
+  assert.equal(elementsByClass(dom, "message-source")[0].textContent, "Home Assistant");
+  assert.ok(elementsByClass(dom, "message-controls").length > 0);
 });
 
 test("normalizes an attention message", () => {
@@ -471,6 +646,16 @@ test("presents friendly labels for known internal sources", () => {
   assert.equal(module.getMessageSourceLabel("custom-source"), "custom-source");
 });
 
+test("translates known source labels but preserves unknown sender labels", () => {
+  const module = instance();
+  module.translate = createTranslator(germanTranslations);
+
+  assert.equal(module.getMessageSourceLabel("magicmirror.weather"), "Wetter");
+  assert.equal(module.getMessageSourceLabel("magicmirror.remote-control"), "Fernsteuerung");
+  assert.equal(module.getMessageSourceLabel("home-assistant.smartthings"), "SmartThings über Home Assistant");
+  assert.equal(module.getMessageSourceLabel("kitchen-display"), "kitchen-display");
+});
+
 test("formats timestamps using MagicMirror 12-hour preferences", () => {
   const module = instance();
   const date = new Date(2026, 6, 23, 14, 5, 6);
@@ -659,6 +844,38 @@ test("uses MagicMirror clock preferences in newly generated weather text", () =>
   assert.doesNotMatch(twentyFourHourModule.messages[0].body, /AM|PM/i);
 });
 
+test("uses the selected language and locale for newly generated rain messages", () => {
+  const module = instance({
+    internalNotifications: {
+      weather: {
+        enabled: true
+      }
+    }
+  });
+  module.translate = createTranslator(germanTranslations);
+  const now = Date.now() + 24 * 60 * 60000;
+  const rainTime = now + 60 * 60000;
+  let formattedRainTime;
+
+  withGlobalConfig({ language: "de", locale: "de-DE", timeFormat: 24 }, () => {
+    formattedRainTime = module.formatClockTime(rainTime);
+    module.handleWeatherUpdated({
+      locationName: "Köln",
+      hourlyArray: [{
+        date: rainTime,
+        weatherType: "rain",
+        precipitationProbability: 80
+      }]
+    }, now);
+  });
+
+  assert.equal(module.messages[0].title, "Regen nähert sich");
+  assert.equal(
+    module.messages[0].body,
+    `Regen wird in der Nähe von Köln gegen ${formattedRainTime} erwartet.`
+  );
+});
+
 test("receives weather through the normal MagicMirror notification path", () => {
   const module = weatherInstance();
   const now = Date.now();
@@ -819,6 +1036,31 @@ test("captures a Remote Control alert without repeating its toast", () => {
   assert.equal(module.messages[0].title, "Delivery");
   assert.equal(module.messages[0].body, "A package is at the door.");
   assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+});
+
+test("translates only the Remote Control fallback and preserves supplied content", () => {
+  const module = instance();
+  module.translate = createTranslator(germanTranslations);
+  const sender = { name: "MMM-Remote-Control" };
+
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { message: "Check the mailbox." },
+    sender
+  );
+  module.notificationReceived(
+    "SHOW_ALERT",
+    { title: "Package delivered", message: "It is beside the front door." },
+    sender
+  );
+
+  assert.deepEqual(
+    module.messages.map(({ title, body }) => ({ title, body })),
+    [
+      { title: "Package delivered", body: "It is beside the front door." },
+      { title: "Remote-Warnung", body: "Check the mailbox." }
+    ]
+  );
 });
 
 test("accepts an intentionally forwarded Remote Control message", () => {

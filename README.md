@@ -25,6 +25,19 @@ notification support requires no external service, account, API key, or special
 hardware. Home Assistant, MQTT, camera snapshots, and other integrations are
 optional and are configured separately by the user.
 
+### Compatibility and validation
+
+MMM-MessageCenter requires MagicMirror² 2.37.0 or newer and follows its Node.js
+baseline: Node.js 22.21.1 or newer in the Node 22 series, or Node 24 and newer.
+Release checks cover a standard MagicMirror configuration with line, compact,
+and full-page presentation; optional transports; and no MMM-pages, Seymour, or
+other hardware integration.
+
+The built-in interface is translated in English, German, Spanish, and French
+and follows MagicMirror's global `language`, `locale`, and `timeFormat`
+preferences. Incoming message titles and bodies are user content and are never
+translated. See [Translations](#translations) for contribution guidance.
+
 ## Design principles
 
 - One normalized entry point for household notifications.
@@ -537,6 +550,24 @@ A timed page action returns only while MessageCenter still owns the automatic
 navigation. Turning the encoder, touching another channel, or otherwise changing
 pages cancels the pending return so an alert cannot fight the user. Consecutive
 timed alerts preserve the page that was visible before the first alert.
+
+## Translations
+
+MessageCenter currently includes English (`en`), German (`de`), Spanish (`es`),
+and French (`fr`). MagicMirror selects the interface language from its global
+`language` setting and formats timestamps using global `locale` and `timeFormat`
+preferences.
+
+Translation files cover MessageCenter-owned interface labels, accessibility
+text, friendly source names, the Remote Control fallback title, and generated
+rain-alert text. Titles and bodies supplied by a webhook, MQTT, Unix socket,
+Home Assistant, Remote Control, or another MagicMirror module remain exactly as
+the sender provided them.
+
+To add a language, copy `translations/en.json`, translate every value without
+changing its key, preserve interpolation variables such as `{title}`, `{time}`,
+and `{location}`, and register the file in `getTranslations()`. `npm run check`
+validates that every language has the same keys and variables as English.
 
 ## Notifications
 

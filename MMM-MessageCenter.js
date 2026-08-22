@@ -1,6 +1,8 @@
 /* global Module, Log, config */
 
 Module.register("MMM-MessageCenter", {
+  requiresVersion: "2.37.0",
+
   defaults: {
     ui: "messages",
     displayMode: "page",
@@ -90,6 +92,15 @@ Module.register("MMM-MessageCenter", {
     return ["MMM-MessageCenter.css"];
   },
 
+  getTranslations() {
+    return {
+      de: "translations/de.json",
+      en: "translations/en.json",
+      es: "translations/es.json",
+      fr: "translations/fr.json"
+    };
+  },
+
   start() {
     this.currentPage = null;
     this.maxPages = null;
@@ -126,7 +137,7 @@ Module.register("MMM-MessageCenter", {
 
     const wrapper = document.createElement("section");
     wrapper.className = `messages-wrapper messages-${this.getDisplayMode()}`;
-    wrapper.setAttribute("aria-label", "Message center");
+    wrapper.setAttribute("aria-label", this.translate("MESSAGE_CENTER"));
     wrapper.setAttribute("aria-live", "polite");
 
     if (this.config.showHeader) {
@@ -139,13 +150,13 @@ Module.register("MMM-MessageCenter", {
 
       const emptyTitle = document.createElement("p");
       emptyTitle.className = "messages-empty-title";
-      emptyTitle.textContent = "You’re all caught up";
+      emptyTitle.textContent = this.translate("ALL_CAUGHT_UP");
       empty.appendChild(emptyTitle);
 
       if (this.getDisplayMode() === "page") {
         const emptyDetail = document.createElement("p");
         emptyDetail.className = "messages-empty-detail";
-        emptyDetail.textContent = "New household messages will appear here.";
+        emptyDetail.textContent = this.translate("EMPTY_DETAIL");
         empty.appendChild(emptyDetail);
       }
 
@@ -170,7 +181,7 @@ Module.register("MMM-MessageCenter", {
       if (message.unread) {
         const unread = document.createElement("span");
         unread.className = "message-unread-indicator";
-        unread.textContent = "New";
+        unread.textContent = this.translate("NEW");
         heading.appendChild(unread);
       }
 
@@ -216,8 +227,8 @@ Module.register("MMM-MessageCenter", {
           const acknowledge = document.createElement("button");
           acknowledge.className = "message-acknowledge";
           acknowledge.type = "button";
-          acknowledge.textContent = "Mark read";
-          acknowledge.setAttribute("aria-label", `Mark ${message.title} read`);
+          acknowledge.textContent = this.translate("MARK_READ");
+          acknowledge.setAttribute("aria-label", this.translate("MARK_TITLE_READ", { title: message.title }));
           acknowledge.addEventListener("click", () => {
             this.acknowledgeMessage(message.source, message.id);
           });
@@ -227,8 +238,8 @@ Module.register("MMM-MessageCenter", {
         const dismiss = document.createElement("button");
         dismiss.className = "message-dismiss";
         dismiss.type = "button";
-        dismiss.textContent = "Dismiss";
-        dismiss.setAttribute("aria-label", `Dismiss ${message.title}`);
+        dismiss.textContent = this.translate("DISMISS");
+        dismiss.setAttribute("aria-label", this.translate("DISMISS_TITLE", { title: message.title }));
         dismiss.addEventListener("click", () => {
           this.dismissMessage(message.source, message.id);
         });
@@ -252,20 +263,20 @@ Module.register("MMM-MessageCenter", {
 
     const title = document.createElement("h2");
     title.className = "messages-title";
-    title.textContent = "Messages";
+    title.textContent = this.translate("MESSAGES");
     heading.appendChild(title);
 
     const count = document.createElement("span");
     count.className = "messages-count";
     const counts = this.getMessageCounts();
     count.textContent = counts.unread
-      ? `${counts.unread} new · ${counts.total} total`
-      : `${counts.total} ${counts.total === 1 ? "message" : "messages"}`;
+      ? this.translate("NEW_TOTAL", { unread: counts.unread, total: counts.total })
+      : this.translate(counts.total === 1 ? "ONE_MESSAGE" : "MESSAGE_COUNT", { total: counts.total });
     count.setAttribute(
       "aria-label",
       counts.unread
-        ? `${counts.unread} unread, ${counts.total} total messages`
-        : `${counts.total} total messages, none unread`
+        ? this.translate("UNREAD_TOTAL_ARIA", { unread: counts.unread, total: counts.total })
+        : this.translate("NONE_UNREAD_ARIA", { total: counts.total })
     );
     if (counts.unread) count.classList.add("has-unread");
     heading.appendChild(count);
@@ -279,7 +290,7 @@ Module.register("MMM-MessageCenter", {
       const acknowledge = document.createElement("button");
       acknowledge.className = "messages-acknowledge";
       acknowledge.type = "button";
-      acknowledge.textContent = "Mark all read";
+      acknowledge.textContent = this.translate("MARK_ALL_READ");
       acknowledge.addEventListener("click", () => this.clearAttention());
       controls.appendChild(acknowledge);
     }
@@ -288,7 +299,7 @@ Module.register("MMM-MessageCenter", {
       const clearRead = document.createElement("button");
       clearRead.className = "messages-clear-read";
       clearRead.type = "button";
-      clearRead.textContent = "Clear read";
+      clearRead.textContent = this.translate("CLEAR_READ");
       clearRead.addEventListener("click", () => this.clearRead());
       controls.appendChild(clearRead);
     }
@@ -352,13 +363,13 @@ Module.register("MMM-MessageCenter", {
 
   getMessageSourceLabel(source) {
     const labels = {
-      "magicmirror.weather": "Weather",
-      "magicmirror.remote-control": "Remote Control",
-      "home-assistant": "Home Assistant",
-      "home-assistant.smartthings": "SmartThings via Home Assistant",
-      smartthings: "SmartThings"
+      "magicmirror.weather": "SOURCE_WEATHER",
+      "magicmirror.remote-control": "SOURCE_REMOTE_CONTROL",
+      "home-assistant": "SOURCE_HOME_ASSISTANT",
+      "home-assistant.smartthings": "SOURCE_SMARTTHINGS_HOME_ASSISTANT",
+      smartthings: "SOURCE_SMARTTHINGS"
     };
-    return labels[source] || source;
+    return labels[source] ? this.translate(labels[source]) : source;
   },
 
   getGlobalDateTimePreferences() {
@@ -609,7 +620,7 @@ Module.register("MMM-MessageCenter", {
         type: mapping.type || "remote.alert",
         source: mapping.source || "magicmirror.remote-control",
         entityId: payload.entityId,
-        title: typeof title === "string" && title.trim() ? title : "Remote alert",
+        title: typeof title === "string" && title.trim() ? title : this.translate("REMOTE_ALERT"),
         body: typeof body === "string" ? body : "",
         urgency: mapping.urgency,
         retention: mapping.retention,
@@ -639,15 +650,16 @@ Module.register("MMM-MessageCenter", {
     );
     if (alreadyTracked) return true;
 
-    const location = payload.locationName ? ` near ${String(payload.locationName)}` : "";
     const forecastTime = this.formatClockTime(forecast.timestamp);
     this.receiveMessage({
       id: rain.messageId,
       type: "weather.precipitation",
       source: rain.source,
       entityId: rain.entityId,
-      title: "Rain approaching",
-      body: `Rain is expected${location} around ${forecastTime}.`,
+      title: this.translate("RAIN_APPROACHING"),
+      body: payload.locationName
+        ? this.translate("RAIN_EXPECTED_NEAR", { location: String(payload.locationName), time: forecastTime })
+        : this.translate("RAIN_EXPECTED", { time: forecastTime }),
       urgency: rain.urgency,
       retention: rain.retention,
       timestamp: now,
