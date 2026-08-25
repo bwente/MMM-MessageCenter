@@ -109,6 +109,7 @@ Module.register("MMM-MessageCenter", {
     this.returnTimer = null;
     this.autoNavigation = null;
     this.expirationTimer = null;
+    this.visibilityHandler = null;
     this.pendingView = null;
 
     this.sendSocketNotification("MC_START", {
@@ -118,13 +119,23 @@ Module.register("MMM-MessageCenter", {
     });
     this.sendNotification("QUERY_PAGE_NUMBER");
     this.startExpirationTimer();
+    this.startVisibilityListener();
     Log.info("[MMM-MessageCenter] Started");
+  },
+
+  suspend() {
+    this.stopExpirationTimer();
+  },
+
+  resume() {
+    this.refreshAfterVisibilityChange();
   },
 
   stop() {
     this.cancelAutoNavigation();
     this.cancelPendingView();
     this.stopExpirationTimer();
+    this.stopVisibilityListener();
     this.sendSocketNotification("MC_STOP");
   },
 
@@ -817,6 +828,32 @@ Module.register("MMM-MessageCenter", {
     if (!this.expirationTimer) return;
     clearInterval(this.expirationTimer);
     this.expirationTimer = null;
+  },
+
+  startVisibilityListener() {
+    this.stopVisibilityListener();
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") {
+      return;
+    }
+
+    this.visibilityHandler = () => {
+      if (document.visibilityState === "visible") this.refreshAfterVisibilityChange();
+    };
+    document.addEventListener("visibilitychange", this.visibilityHandler);
+  },
+
+  stopVisibilityListener() {
+    if (!this.visibilityHandler) return;
+    if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+    }
+    this.visibilityHandler = null;
+  },
+
+  refreshAfterVisibilityChange() {
+    const changed = this.pruneExpiredMessages();
+    this.startExpirationTimer();
+    if (!changed) this.updateDom(0);
   },
 
   pruneExpiredMessages(now = Date.now()) {
