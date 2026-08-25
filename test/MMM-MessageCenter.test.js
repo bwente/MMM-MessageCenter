@@ -40,6 +40,7 @@ function instance(config = {}) {
     returnTimer: null,
     autoNavigation: null,
     expirationTimer: null,
+    visibilityHandler: null,
     pendingView: null,
     notifications,
     socketNotifications,
@@ -1278,6 +1279,65 @@ test("clears attention after the message page first renders", async () => {
   assert.equal(module.messages[0].unread, false);
   assert.equal(renders, 2);
   assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
+});
+
+test("resume prunes messages that expired while the module was suspended", () => {
+  const module = instance({ expirationSweepInterval: 60000 });
+  let renders = 0;
+  module.updateDom = () => {
+    renders += 1;
+  };
+  module.startExpirationTimer();
+  module.messages = [
+    {
+      source: "home-assistant.smartthings",
+      id: "dishwasher",
+      expires: Date.now() - 1,
+      unread: false
+    }
+  ];
+
+  module.suspend();
+  assert.equal(module.expirationTimer, null);
+
+  module.resume();
+
+  assert.deepEqual(module.messages, []);
+  assert.notEqual(module.expirationTimer, null);
+  assert.equal(renders, 1);
+  module.stopExpirationTimer();
+});
+
+test("becoming visible prunes expired messages and re-arms expiration", () => {
+  const previousDocument = global.document;
+  const listeners = new Map();
+  global.document = {
+    visibilityState: "hidden",
+    addEventListener(name, listener) {
+      listeners.set(name, listener);
+    },
+    removeEventListener(name, listener) {
+      if (listeners.get(name) === listener) listeners.delete(name);
+    }
+  };
+
+  try {
+    const module = instance({ expirationSweepInterval: 60000 });
+    module.messages = [{ source: "chores", id: "old", expires: Date.now() - 1 }];
+    module.startVisibilityListener();
+
+    global.document.visibilityState = "visible";
+    listeners.get("visibilitychange")();
+
+    assert.deepEqual(module.messages, []);
+    assert.notEqual(module.expirationTimer, null);
+    module.stopExpirationTimer();
+    module.stopVisibilityListener();
+    assert.equal(listeners.has("visibilitychange"), false);
+  } finally {
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+  }
 });
 
 test("leaving the message page cancels pending viewed state", async () => {
