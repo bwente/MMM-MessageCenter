@@ -6,9 +6,9 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ### Fixed
 
-- Recheck message expiration and restore the expiration sweep when MagicMirror
-  resumes the module or the Electron page becomes visible again, preventing
-  stale messages from remaining on a physical display after their expiry time.
+- Keep expiration checks active while MagicMirror hides or suspends the module,
+  restore a missing sweep when retained history arrives, and recheck expiration
+  when the module resumes or Electron becomes visible again.
 
 ### Documentation
 

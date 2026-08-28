@@ -1281,7 +1281,7 @@ test("clears attention after the message page first renders", async () => {
   assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
 });
 
-test("resume prunes messages that expired while the module was suspended", () => {
+test("expiration remains armed while the module is suspended", () => {
   const module = instance({ expirationSweepInterval: 60000 });
   let renders = 0;
   module.updateDom = () => {
@@ -1297,14 +1297,29 @@ test("resume prunes messages that expired while the module was suspended", () =>
     }
   ];
 
+  const expirationTimer = module.expirationTimer;
   module.suspend();
-  assert.equal(module.expirationTimer, null);
+  assert.equal(module.expirationTimer, expirationTimer);
 
   module.resume();
 
   assert.deepEqual(module.messages, []);
   assert.notEqual(module.expirationTimer, null);
   assert.equal(renders, 1);
+  module.stopExpirationTimer();
+});
+
+test("receiving retained history restores a missing expiration sweep", () => {
+  const module = instance({ expirationSweepInterval: 60000, showToasts: false });
+
+  module.receiveMessage({
+    id: "dishwasher",
+    source: "home-assistant.chores",
+    title: "Chore Reminder",
+    expires: Date.now() + 3600000
+  });
+
+  assert.notEqual(module.expirationTimer, null);
   module.stopExpirationTimer();
 });
 
