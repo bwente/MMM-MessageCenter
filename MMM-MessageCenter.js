@@ -140,6 +140,8 @@ Module.register("MMM-MessageCenter", {
   },
 
   getDom() {
+    this.pruneExpiredMessages(Date.now(), false);
+
     if (this.config.ui !== "messages") {
       const hidden = document.createElement("div");
       hidden.style.display = "none";
@@ -862,7 +864,7 @@ Module.register("MMM-MessageCenter", {
     if (!changed) this.updateDom(0);
   },
 
-  pruneExpiredMessages(now = Date.now()) {
+  pruneExpiredMessages(now = Date.now(), updateDom = true) {
     const previousAttentionState = this.getAttentionState();
     const retained = this.messages.filter(
       (message) => message.expires === null || message.expires > now
@@ -871,7 +873,7 @@ Module.register("MMM-MessageCenter", {
 
     this.messages = retained;
     this.publishAttention(previousAttentionState);
-    this.updateDom(200);
+    if (updateDom) this.updateDom(0);
     return true;
   },
 

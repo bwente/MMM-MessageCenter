@@ -8,7 +8,8 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 - Keep expiration checks active while MagicMirror hides or suspends the module,
   restore a missing sweep when retained history arrives, and recheck expiration
-  when the module resumes or Electron becomes visible again.
+  when the module resumes or Electron becomes visible again. Expiration now uses
+  an immediate redraw, and every render defensively excludes stale history.
 
 ### Documentation
 
