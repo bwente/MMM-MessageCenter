@@ -124,7 +124,7 @@ Module.register("MMM-MessageCenter", {
   },
 
   suspend() {
-    this.stopExpirationTimer();
+    this.ensureExpirationTimer();
   },
 
   resume() {
@@ -536,6 +536,7 @@ Module.register("MMM-MessageCenter", {
       this.messages.sort((left, right) => right.timestamp - left.timestamp);
       this.messages = this.messages.slice(0, this.getMaxMessages());
       this.pruneCachedImages();
+      if (message.expires !== null) this.ensureExpirationTimer();
       inboxChanged = true;
     }
     if (inboxChanged) this.publishAttention(previousAttentionState);
@@ -822,6 +823,11 @@ Module.register("MMM-MessageCenter", {
       () => this.pruneExpiredMessages(),
       Math.max(1000, configuredInterval)
     );
+    if (typeof this.expirationTimer.unref === "function") this.expirationTimer.unref();
+  },
+
+  ensureExpirationTimer() {
+    if (!this.expirationTimer) this.startExpirationTimer();
   },
 
   stopExpirationTimer() {
