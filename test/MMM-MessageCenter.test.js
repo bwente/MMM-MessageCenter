@@ -1184,6 +1184,10 @@ test("allows Remote Control notification mappings to be disabled", () => {
 
 test("prunes expired messages and publishes cleared attention state", () => {
   const module = instance({ showToasts: false });
+  let renderSpeed = null;
+  module.updateDom = (speed) => {
+    renderSpeed = speed;
+  };
   const now = Date.now();
   module.messages = [
     {
@@ -1208,10 +1212,36 @@ test("prunes expired messages and publishes cleared attention state", () => {
   assert.equal(module.pruneExpiredMessages(now), true);
   assert.deepEqual(module.messages.map(({ id }) => id), ["weather"]);
   assert.equal(module.unreadAttentionCount, 0);
+  assert.equal(renderSpeed, 0);
   assert.deepEqual(module.notifications.map(({ name }) => name), [
     "MESSAGE_CENTER_ATTENTION_CHANGED",
     "ATTENTION_OFF"
   ]);
+});
+
+test("rendering defensively removes expired history without requesting another render", () => {
+  const module = instance({ displayMode: "line" });
+  let renders = 0;
+  module.updateDom = () => {
+    renders += 1;
+  };
+  module.messages = [
+    {
+      id: "dishwasher",
+      source: "home-assistant.chores",
+      title: "Chore Reminder",
+      urgency: "attention",
+      retention: "untilViewed",
+      unread: true,
+      expires: Date.now() - 1
+    }
+  ];
+
+  const dom = withFakeDocument(() => module.getDom());
+
+  assert.deepEqual(module.messages, []);
+  assert.equal(elementsByClass(dom, "message-item").length, 0);
+  assert.equal(renders, 0);
 });
 
 test("publishes a structured attention snapshot", () => {
