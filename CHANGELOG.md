@@ -10,6 +10,12 @@ All notable changes to MMM-MessageCenter are documented in this file.
   restore a missing sweep when retained history arrives, and recheck expiration
   when the module resumes or Electron becomes visible again. Expiration now uses
   an immediate redraw, and every render defensively excludes stale history.
+- Retain REST, MQTT, and Unix-socket messages in the server-side in-memory queue
+  and periodically synchronize connected displays, preventing accepted messages
+  from being lost during browser or socket reconnects. Read, dismissal, clear,
+  and expiration state now converge across displays.
+- Keep shared transports running when an individual browser client refreshes or
+  closes instead of allowing that client to stop the server-wide listeners.
 
 ### Documentation
 

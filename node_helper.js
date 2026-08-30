@@ -14,11 +14,20 @@ module.exports = NodeHelper.create({
     this.mqttClient = null;
     this.unixServer = null;
     this.imageConfig = this.getImageConfig();
+    this.messageQueue = [];
+    this.messageSequence = 0;
+    this.maxMessages = 50;
+    this.queueSweepInterval = 60000;
+    this.queueTimer = null;
+    this.queueImageLimits = this.getQueueImageLimits();
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "MC_START") this.startTransports(payload);
-    if (notification === "MC_STOP") this.stopTransports();
+    if (notification === "MC_START") {
+      this.startTransports(payload);
+    }
+    if (notification === "MC_SYNC_REQUEST") this.sendQueueSnapshot();
+    if (notification === "MC_QUEUE_COMMAND") this.applyQueueCommand(payload);
   },
 
   startTransports(rawConfig = {}) {
@@ -27,6 +36,15 @@ module.exports = NodeHelper.create({
       : {};
     const hasTransportBundle = Object.prototype.hasOwnProperty.call(config, "webhook");
     this.imageConfig = this.getImageConfig(hasTransportBundle ? config.images : {});
+    this.queueImageLimits = this.getQueueImageLimits(hasTransportBundle ? config.images : {});
+    this.maxMessages = Number.isInteger(config.maxMessages) && config.maxMessages > 0
+      ? config.maxMessages
+      : 50;
+    this.queueSweepInterval = Number.isFinite(Number(config.expirationSweepInterval)) &&
+      Number(config.expirationSweepInterval) > 0
+      ? Math.max(1000, Number(config.expirationSweepInterval))
+      : 60000;
+    this.startQueueTimer();
     this.startWebhook(hasTransportBundle ? config.webhook : config);
 
     const transports = hasTransportBundle && config.transports &&
@@ -102,17 +120,203 @@ module.exports = NodeHelper.create({
         ? payload
         : { ...payload, timestamp: Date.now() };
       this.cacheImage(imageRequest)
-        .then((image) => this.sendSocketNotification("MC_MESSAGE", { ...queuedPayload, image }))
+        .then((image) => this.publishPayload({ ...queuedPayload, image }))
         .catch(() => {
           this.sendSocketNotification("MC_ERROR", "Message image could not be cached");
           const fallback = { ...queuedPayload };
           delete fallback.image;
-          this.sendSocketNotification("MC_MESSAGE", fallback);
+          this.publishPayload(fallback);
         });
       return true;
     }
-    this.sendSocketNotification("MC_MESSAGE", payload);
+    return this.publishPayload(payload);
+  },
+
+  publishPayload(payload) {
+    const message = this.normalizeQueuedPayload(payload);
+    if (!message) return false;
+
+    if (message.retention !== "ephemeral") {
+      const existingIndex = this.messageQueue.findIndex(
+        (stored) => stored.source === message.source && stored.id === message.id
+      );
+      if (existingIndex !== -1) {
+        if (this.messageQueue[existingIndex].timestamp > message.timestamp) return false;
+        this.messageQueue.splice(existingIndex, 1);
+      }
+      this.messageQueue.unshift(message);
+      this.messageQueue.sort((left, right) => right.timestamp - left.timestamp);
+      this.messageQueue = this.messageQueue.slice(0, this.maxMessages);
+      this.pruneQueueImages();
+    }
+
+    this.sendSocketNotification("MC_MESSAGE", message);
     return true;
+  },
+
+  normalizeQueuedPayload(payload) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+
+    const now = Date.now();
+    const timestamp = Number.isFinite(payload.timestamp) ? payload.timestamp : now;
+    const expires = Number.isFinite(payload.expires) ? payload.expires : null;
+    if (expires !== null && expires <= now) return null;
+
+    const urgencyValues = ["passive", "attention", "critical"];
+    const urgency = urgencyValues.includes(payload.urgency)
+      ? payload.urgency
+      : payload.priority === "attention"
+        ? "attention"
+        : "passive";
+    const retentionValues = ["ephemeral", "untilViewed", "untilAcknowledged", "archive"];
+    const retention = retentionValues.includes(payload.retention)
+      ? payload.retention
+      : urgency === "critical"
+        ? "untilAcknowledged"
+        : urgency === "attention"
+          ? "untilViewed"
+          : "archive";
+    const source = String(payload.source || "unknown");
+    const hasId = payload.id !== undefined && payload.id !== null && payload.id !== "";
+    const id = hasId
+      ? String(payload.id)
+      : `transport-${timestamp}-${this.messageSequence += 1}`;
+
+    return {
+      ...payload,
+      id,
+      source,
+      urgency,
+      retention,
+      timestamp,
+      expires,
+      unread: typeof payload.unread === "boolean"
+        ? payload.unread
+        : urgency !== "passive" && retention !== "ephemeral"
+    };
+  },
+
+  sendQueueSnapshot() {
+    this.pruneQueue(Date.now(), false);
+    this.sendSocketNotification("MC_SNAPSHOT", this.messageQueue.map((message) => ({
+      ...message
+    })));
+  },
+
+  startQueueTimer() {
+    this.stopQueueTimer();
+    this.queueTimer = setInterval(() => this.pruneQueue(), this.queueSweepInterval);
+    if (typeof this.queueTimer.unref === "function") this.queueTimer.unref();
+  },
+
+  stopQueueTimer() {
+    if (!this.queueTimer) return;
+    clearInterval(this.queueTimer);
+    this.queueTimer = null;
+  },
+
+  pruneQueue(now = Date.now(), notify = true) {
+    const retained = this.messageQueue.filter(
+      (message) => message.expires === null || message.expires > now
+    );
+    if (retained.length === this.messageQueue.length) return false;
+    this.messageQueue = retained;
+    if (notify) this.sendQueueSnapshot();
+    return true;
+  },
+
+  applyQueueCommand(command) {
+    if (!command || typeof command !== "object" || Array.isArray(command)) return false;
+    let changed = false;
+
+    if (command.action === "acknowledgeAll") {
+      this.messageQueue.forEach((message) => {
+        if (message.unread) {
+          message.unread = false;
+          changed = true;
+        }
+      });
+    } else if (command.action === "markViewed") {
+      this.messageQueue.forEach((message) => {
+        if (message.retention !== "untilAcknowledged" && message.unread) {
+          message.unread = false;
+          changed = true;
+        }
+      });
+    } else if (command.action === "clearRead") {
+      const length = this.messageQueue.length;
+      this.messageQueue = this.messageQueue.filter((message) => message.unread);
+      changed = this.messageQueue.length !== length;
+    } else if (command.action === "clearAll") {
+      changed = this.messageQueue.length > 0;
+      this.messageQueue = [];
+    } else if (command.action === "acknowledge" || command.action === "dismiss") {
+      if (command.source === undefined || command.id === undefined) return false;
+      const source = String(command.source);
+      const id = String(command.id);
+      const message = this.messageQueue.find(
+        (candidate) => candidate.source === source && candidate.id === id
+      );
+      if (!message) return false;
+      if (command.action === "acknowledge") {
+        if (message.unread) {
+          message.unread = false;
+          changed = true;
+        }
+      } else {
+        this.messageQueue = this.messageQueue.filter((candidate) => candidate !== message);
+        changed = true;
+      }
+    } else {
+      return false;
+    }
+
+    if (!changed) return false;
+    this.sendQueueSnapshot();
+    return true;
+  },
+
+  getQueueImageLimits(rawConfig = {}) {
+    const config = rawConfig && typeof rawConfig === "object" && !Array.isArray(rawConfig)
+      ? rawConfig
+      : {};
+    return {
+      maxCachedImages: Number.isInteger(config.maxCachedImages) && config.maxCachedImages >= 0
+        ? config.maxCachedImages
+        : 12,
+      maxTotalBytes: Number.isInteger(config.maxTotalBytes) && config.maxTotalBytes >= 0
+        ? config.maxTotalBytes
+        : 12 * 1024 * 1024
+    };
+  },
+
+  getCachedImageBytes(image) {
+    if (!image || typeof image.dataUrl !== "string") return 0;
+    const separator = image.dataUrl.indexOf(",");
+    if (separator === -1) return 0;
+    const encoded = image.dataUrl.slice(separator + 1);
+    const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+    return Math.max(0, Math.floor(encoded.length * 3 / 4) - padding);
+  },
+
+  pruneQueueImages() {
+    const { maxCachedImages, maxTotalBytes } = this.queueImageLimits;
+    let retainedCount = 0;
+    let retainedBytes = 0;
+
+    this.messageQueue.forEach((message) => {
+      if (!message.image || typeof message.image !== "object") return;
+      const imageBytes = this.getCachedImageBytes(message.image);
+      if (
+        retainedCount >= maxCachedImages ||
+        retainedBytes + imageBytes > maxTotalBytes
+      ) {
+        message.image = null;
+        return;
+      }
+      retainedCount += 1;
+      retainedBytes += imageBytes;
+    });
   },
 
   getImageConfig(rawConfig = {}) {
@@ -449,6 +653,7 @@ module.exports = NodeHelper.create({
   },
 
   stopTransports() {
+    this.stopQueueTimer();
     this.stopWebhook();
     this.stopMqtt();
     this.stopUnixSocket();

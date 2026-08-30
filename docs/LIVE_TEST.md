@@ -29,6 +29,15 @@ Do not place tokens, addresses, or private household payloads in this document.
 
 ## Recovery
 
+- Send a retained webhook message with an expiration several minutes in the
+  future, reload one connected browser, and confirm the message is restored
+  without another toast.
+- Confirm the same retained message appears on both the physical display and a
+  separately opened MagicMirror browser.
+- Allow the message to expire and confirm both displays remove it without a new
+  message or manual refresh.
+- Close or refresh the secondary browser, send another message, and confirm the
+  physical display continues receiving transport messages.
 - Review MagicMirror logs for MessageCenter errors.
 - If normal mirror behavior regresses, restore the timestamped module backup and
   restart MagicMirror before investigating further.
