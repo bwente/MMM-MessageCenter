@@ -27,6 +27,12 @@ function helper() {
     unixServer: null,
     unixSocketPath: null,
     imageConfig: helperDefinition.getImageConfig(),
+    messageQueue: [],
+    messageSequence: 0,
+    maxMessages: 50,
+    queueSweepInterval: 60000,
+    queueTimer: null,
+    queueImageLimits: helperDefinition.getQueueImageLimits(),
     socketNotifications,
     sendSocketNotification(name, payload) {
       socketNotifications.push({ name, payload });
@@ -132,10 +138,10 @@ test("parses transport payloads through the shared message path", () => {
   const module = helper();
 
   assert.equal(module.parsePayload('{"title":"Disk space low"}', "test"), true);
-  assert.deepEqual(module.socketNotifications[0], {
-    name: "MC_MESSAGE",
-    payload: { title: "Disk space low" }
-  });
+  assert.equal(module.socketNotifications[0].name, "MC_MESSAGE");
+  assert.equal(module.socketNotifications[0].payload.title, "Disk space low");
+  assert.equal(module.socketNotifications[0].payload.retention, "archive");
+  assert.equal(module.messageQueue.length, 1);
 
   assert.equal(module.parsePayload("not-json", "test"), false);
   assert.match(module.socketNotifications.at(-1).payload, /Invalid JSON/);
@@ -143,6 +149,97 @@ test("parses transport payloads through the shared message path", () => {
   assert.match(module.socketNotifications.at(-1).payload, /JSON object/);
   assert.equal(module.parsePayload("x".repeat(33 * 1024), "test"), false);
   assert.match(module.socketNotifications.at(-1).payload, /exceeded/);
+});
+
+test("replays retained transport messages when a display reconnects", () => {
+  const module = helper();
+  const expires = Date.now() + 60000;
+
+  assert.equal(module.ingestPayload({
+    id: "delivery-test",
+    source: "home-assistant.test",
+    title: "Delivery test",
+    urgency: "attention",
+    retention: "untilViewed",
+    expires
+  }), true);
+  module.socketNotifications.length = 0;
+
+  module.socketNotificationReceived("MC_SYNC_REQUEST");
+
+  assert.equal(module.socketNotifications.length, 1);
+  assert.equal(module.socketNotifications[0].name, "MC_SNAPSHOT");
+  assert.equal(module.socketNotifications[0].payload.length, 1);
+  assert.equal(module.socketNotifications[0].payload[0].id, "delivery-test");
+  assert.equal(module.socketNotifications[0].payload[0].unread, true);
+});
+
+test("an individual display cannot stop shared transports", () => {
+  const module = helper();
+  let stopped = false;
+  module.stopTransports = () => {
+    stopped = true;
+  };
+
+  module.socketNotificationReceived("MC_STOP");
+
+  assert.equal(stopped, false);
+});
+
+test("server queue expires messages and synchronizes the removal", () => {
+  const module = helper();
+  const now = Date.now();
+  module.messageQueue = [module.normalizeQueuedPayload({
+    id: "short-lived",
+    source: "home-assistant.test",
+    title: "Short lived",
+    expires: now + 1000
+  })];
+
+  assert.equal(module.pruneQueue(now + 1001), true);
+  assert.deepEqual(module.messageQueue, []);
+  assert.equal(module.socketNotifications.at(-1).name, "MC_SNAPSHOT");
+  assert.deepEqual(module.socketNotifications.at(-1).payload, []);
+});
+
+test("server queue applies shared read and dismissal state", () => {
+  const module = helper();
+  module.publishPayload({
+    id: "one",
+    source: "home-assistant",
+    title: "One",
+    urgency: "attention",
+    retention: "untilViewed"
+  });
+  module.publishPayload({
+    id: "two",
+    source: "home-assistant",
+    title: "Two",
+    urgency: "critical",
+    retention: "untilAcknowledged"
+  });
+
+  assert.equal(module.applyQueueCommand({ action: "markViewed" }), true);
+  assert.equal(module.messageQueue.find(({ id }) => id === "one").unread, false);
+  assert.equal(module.messageQueue.find(({ id }) => id === "two").unread, true);
+  assert.equal(module.applyQueueCommand({
+    action: "dismiss",
+    source: "home-assistant",
+    id: "two"
+  }), true);
+  assert.deepEqual(module.messageQueue.map(({ id }) => id), ["one"]);
+});
+
+test("ephemeral transport messages are broadcast without entering replay history", () => {
+  const module = helper();
+
+  assert.equal(module.publishPayload({
+    title: "Toast only",
+    retention: "ephemeral"
+  }), true);
+
+  assert.equal(module.socketNotifications[0].name, "MC_MESSAGE");
+  assert.deepEqual(module.messageQueue, []);
 });
 
 test("subscribes to configured MQTT topics and ingests matching messages", () => {
@@ -183,8 +280,10 @@ test("subscribes to configured MQTT topics and ingests matching messages", () =>
     options: { qos: 0 }
   });
   assert.deepEqual(
-    module.socketNotifications.filter(({ name }) => name === "MC_MESSAGE"),
-    [{ name: "MC_MESSAGE", payload: { title: "Network offline" } }]
+    module.socketNotifications
+      .filter(({ name }) => name === "MC_MESSAGE")
+      .map(({ payload }) => payload.title),
+    ["Network offline"]
   );
   assert.equal(ended, true);
   assert.equal(module.mqttClient, null);
@@ -230,8 +329,10 @@ test("accepts newline-delimited messages from a Unix connection", () => {
   connection.emit("end");
 
   assert.deepEqual(
-    module.socketNotifications.filter(({ name }) => name === "MC_MESSAGE"),
-    [{ name: "MC_MESSAGE", payload: { title: "Storage warning" } }]
+    module.socketNotifications
+      .filter(({ name }) => name === "MC_MESSAGE")
+      .map(({ payload }) => payload.title),
+    ["Storage warning"]
   );
   assert.deepEqual(responses, [
     '{"status":"accepted"}\n',

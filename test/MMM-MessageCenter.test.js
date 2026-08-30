@@ -40,6 +40,7 @@ function instance(config = {}) {
     returnTimer: null,
     autoNavigation: null,
     expirationTimer: null,
+    syncTimer: null,
     visibilityHandler: null,
     pendingView: null,
     notifications,
@@ -245,7 +246,69 @@ test("runs in a standard region without MMM-pages or companion integrations", ()
   assert.equal(elementsByClass(dom, "message-title")[0].textContent, "Standalone message");
   assert.equal(module.notifications.some(({ name }) => name === "PAGE_CHANGED"), false);
   assert.equal(module.socketNotifications[0].name, "MC_START");
-  assert.equal(module.socketNotifications.at(-1).name, "MC_STOP");
+  assert.equal(module.socketNotifications.some(({ name }) => name === "MC_SYNC_REQUEST"), true);
+  assert.equal(module.syncTimer, null);
+});
+
+test("reconciles transport history after a display reconnect", () => {
+  const module = instance({ displayMode: "line", showToasts: false });
+  module.messages = [
+    {
+      ...module.normalizeMessage({
+        id: "rain",
+        source: "magicmirror.weather",
+        title: "Rain approaching"
+      }),
+      transportManaged: false
+    },
+    module.normalizeMessage({
+      id: "stale",
+      source: "home-assistant.chores",
+      title: "Old transport message"
+    }, { transportManaged: true, honorState: true })
+  ];
+
+  assert.equal(module.reconcileTransportSnapshot([
+    {
+      id: "current",
+      source: "home-assistant.test",
+      title: "Recovered message",
+      urgency: "attention",
+      retention: "untilViewed",
+      timestamp: Date.now() + 1000,
+      expires: Date.now() + 60000,
+      unread: true
+    }
+  ]), true);
+
+  assert.deepEqual(module.messages.map(({ id }) => id), ["current", "rain"]);
+  assert.equal(module.messages[0].transportManaged, true);
+  assert.equal(module.messages[0].unread, true);
+});
+
+test("synchronizes transport acknowledgement and dismissal commands", () => {
+  const module = instance({ showToasts: false });
+  module.socketNotificationReceived("MC_MESSAGE", {
+    id: "door",
+    source: "home-assistant",
+    title: "Door open",
+    urgency: "attention",
+    retention: "untilViewed",
+    unread: true
+  });
+
+  assert.equal(module.acknowledgeMessage("home-assistant", "door"), true);
+  assert.deepEqual(module.socketNotifications.at(-1), {
+    name: "MC_QUEUE_COMMAND",
+    payload: { action: "acknowledge", source: "home-assistant", id: "door" }
+  });
+
+  module.messages[0].unread = true;
+  assert.equal(module.dismissMessage("home-assistant", "door"), true);
+  assert.deepEqual(module.socketNotifications.at(-1), {
+    name: "MC_QUEUE_COMMAND",
+    payload: { action: "dismiss", source: "home-assistant", id: "door" }
+  });
 });
 
 test("renders standard-region line mode as translated title-and-time rows", () => {

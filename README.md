@@ -8,7 +8,7 @@ notification experience.
 
 The project is intended to make MagicMirror behave less like a collection of
 dashboard widgets and more like an ambient information appliance. The current
-release provides a webhook, an in-memory message queue, toast alerts, semantic
+release provides a webhook, a synchronized in-memory message queue, toast alerts, semantic
 attention notifications, an optional inbox, and optional page routing through
 [MMM-pages](https://github.com/edward-shen/MMM-pages).
 
@@ -30,8 +30,8 @@ optional and are configured separately by the user.
 MMM-MessageCenter requires MagicMirror² 2.37.0 or newer and follows its Node.js
 baseline: Node.js 22.21.1 or newer in the Node 22 series, or Node 24 and newer.
 Release checks cover a standard MagicMirror configuration with line, compact,
-and full-page presentation; optional transports; and no MMM-pages, Seymour, or
-other hardware integration.
+and full-page presentation; optional transports; and no MMM-pages or hardware
+integration.
 
 The built-in interface is translated in English, German, Spanish, and French
 and follows MagicMirror's global `language`, `locale`, and `timeFormat`
@@ -119,6 +119,7 @@ sets the visible count in compact mode. Its history buttons remain hidden unless
     },
     maxMessages: 50,
     expirationSweepInterval: 60000,
+    syncInterval: 15000,
     publishAttentionState: true,
     showHeader: true,
     showToasts: true,
@@ -182,6 +183,7 @@ for its complete page layout syntax.
 | `channelRoutes` | object | `{}` | Maps semantic channel names such as `weather` to MMM-pages indexes. The built-in `messages` route always uses `messagesPage`. |
 | `maxMessages` | integer | `50` | Hard limit for all retained messages. Oldest history is displaced when the queue reaches this size. |
 | `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
+| `syncInterval` | number | `15000` | Milliseconds between display synchronization requests. This recovers messages after a browser or socket reconnect; use `0` to disable periodic synchronization. |
 | `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
 | `showHeader` | boolean | `true` | Show the inbox title, explicit unread/total counts, and touch-friendly history controls. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
@@ -535,8 +537,17 @@ the explicit fields.
 After the inbox first renders, it clears `untilViewed` attention and transitions
 from the unread styling to the read urgency edge. Messages marked
 `untilAcknowledged` continue requesting attention until the user explicitly
-marks them read. Messages remain in bounded in-memory history until they expire,
-are cleared, or are displaced by `maxMessages`.
+marks them read.
+
+Messages received through REST, MQTT, or the Unix socket are held by the
+MagicMirror server and synchronized across connected displays. A display that
+reconnects requests the current queue, so a brief browser or socket interruption
+does not silently lose an accepted message. Read, dismissal, clearing, and
+expiration state are synchronized as well. The queue remains in memory only and
+starts empty when the MagicMirror server restarts.
+
+Messages remain in bounded in-memory history until they expire, are cleared, or
+are displaced by `maxMessages`.
 
 The header distinguishes unread attention from retained history. **Mark all
 read** acknowledges unread messages; **Clear read** removes only acknowledged

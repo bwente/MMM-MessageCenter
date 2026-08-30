@@ -18,6 +18,7 @@ Module.register("MMM-MessageCenter", {
     channelRoutes: {},
     maxMessages: 50,
     expirationSweepInterval: 60000,
+    syncInterval: 15000,
     publishAttentionState: true,
     showHeader: true,
     showToasts: true,
@@ -109,14 +110,18 @@ Module.register("MMM-MessageCenter", {
     this.returnTimer = null;
     this.autoNavigation = null;
     this.expirationTimer = null;
+    this.syncTimer = null;
     this.visibilityHandler = null;
     this.pendingView = null;
 
     this.sendSocketNotification("MC_START", {
       webhook: this.config.webhook,
       transports: this.config.transports,
-      images: this.config.images
+      images: this.config.images,
+      maxMessages: this.getMaxMessages(),
+      expirationSweepInterval: this.config.expirationSweepInterval
     });
+    this.startSyncTimer();
     this.sendNotification("QUERY_PAGE_NUMBER");
     this.startExpirationTimer();
     this.startVisibilityListener();
@@ -135,8 +140,8 @@ Module.register("MMM-MessageCenter", {
     this.cancelAutoNavigation();
     this.cancelPendingView();
     this.stopExpirationTimer();
+    this.stopSyncTimer();
     this.stopVisibilityListener();
-    this.sendSocketNotification("MC_STOP");
   },
 
   getDom() {
@@ -498,12 +503,17 @@ Module.register("MMM-MessageCenter", {
       return;
     }
 
+    if (notification === "MC_SNAPSHOT") {
+      this.reconcileTransportSnapshot(payload);
+      return;
+    }
+
     if (notification !== "MC_MESSAGE") return;
-    this.receiveMessage(payload);
+    this.receiveMessage(payload, { transportManaged: true, honorState: true });
   },
 
   receiveMessage(payload, options = {}) {
-    const message = this.normalizeMessage(payload);
+    const message = this.normalizeMessage(payload, options);
     if (!message) {
       Log.warn("[MMM-MessageCenter] Ignored invalid or expired message");
       return false;
@@ -861,7 +871,52 @@ Module.register("MMM-MessageCenter", {
   refreshAfterVisibilityChange() {
     const changed = this.pruneExpiredMessages();
     this.startExpirationTimer();
+    this.requestQueueSync();
     if (!changed) this.updateDom(0);
+  },
+
+  startSyncTimer() {
+    this.stopSyncTimer();
+    this.requestQueueSync();
+    const configuredInterval = Number(this.config.syncInterval);
+    if (!Number.isFinite(configuredInterval) || configuredInterval <= 0) return;
+
+    this.syncTimer = setInterval(
+      () => this.requestQueueSync(),
+      Math.max(1000, configuredInterval)
+    );
+    if (typeof this.syncTimer.unref === "function") this.syncTimer.unref();
+  },
+
+  stopSyncTimer() {
+    if (!this.syncTimer) return;
+    clearInterval(this.syncTimer);
+    this.syncTimer = null;
+  },
+
+  requestQueueSync() {
+    this.sendSocketNotification("MC_SYNC_REQUEST");
+  },
+
+  reconcileTransportSnapshot(payload) {
+    if (!Array.isArray(payload)) return false;
+
+    const previousAttentionState = this.getAttentionState();
+    const localMessages = this.messages.filter((message) => !message.transportManaged);
+    const transportMessages = payload
+      .map((message) => this.normalizeMessage(message, {
+        transportManaged: true,
+        honorState: true
+      }))
+      .filter(Boolean);
+
+    this.messages = [...localMessages, ...transportMessages]
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .slice(0, this.getMaxMessages());
+    this.pruneCachedImages();
+    this.publishAttention(previousAttentionState);
+    this.updateDom(0);
+    return true;
   },
 
   pruneExpiredMessages(now = Date.now(), updateDom = true) {
@@ -925,9 +980,11 @@ Module.register("MMM-MessageCenter", {
 
   clearAttention() {
     const previousAttentionState = this.getAttentionState();
+    const hasManagedMessages = this.messages.some((message) => message.transportManaged);
     this.messages.forEach((message) => {
       message.unread = false;
     });
+    if (hasManagedMessages) this.sendQueueCommand({ action: "acknowledgeAll" });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
   },
@@ -948,13 +1005,23 @@ Module.register("MMM-MessageCenter", {
 
     const previousAttentionState = this.getAttentionState();
     message.unread = false;
+    if (message.transportManaged) {
+      this.sendQueueCommand({ action: "acknowledge", source, id });
+    }
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
     return true;
   },
 
   dismissMessage(source, id) {
-    return this.resolveMessage(source, id);
+    const message = this.messages.find(
+      (candidate) => candidate.source === source && candidate.id === id
+    );
+    const resolved = this.resolveMessage(source, id);
+    if (resolved && message && message.transportManaged) {
+      this.sendQueueCommand({ action: "dismiss", source, id });
+    }
+    return resolved;
   },
 
   scheduleMarkViewed() {
@@ -1001,16 +1068,24 @@ Module.register("MMM-MessageCenter", {
   clearRead() {
     const retained = this.messages.filter((message) => message.unread);
     if (retained.length === this.messages.length) return false;
+    const removedManagedMessage = this.messages.some(
+      (message) => message.transportManaged && !message.unread
+    );
     this.messages = retained;
+    if (removedManagedMessage) this.sendQueueCommand({ action: "clearRead" });
     this.updateDom(200);
     return true;
   },
 
   markViewed() {
     const previousAttentionState = this.getAttentionState();
+    const managedMessageViewed = this.messages.some(
+      (message) => message.transportManaged && message.retention !== "untilAcknowledged"
+    );
     this.messages.forEach((message) => {
       if (message.retention !== "untilAcknowledged") message.unread = false;
     });
+    if (managedMessageViewed) this.sendQueueCommand({ action: "markViewed" });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
   },
@@ -1031,7 +1106,9 @@ Module.register("MMM-MessageCenter", {
   clearMessages() {
     this.cancelAutoNavigation();
     const previousAttentionState = this.getAttentionState();
+    const hadManagedMessages = this.messages.some((message) => message.transportManaged);
     this.messages = [];
+    if (hadManagedMessages) this.sendQueueCommand({ action: "clearAll" });
     this.publishAttention(previousAttentionState);
     this.updateDom(200);
   },
@@ -1040,6 +1117,10 @@ Module.register("MMM-MessageCenter", {
     return Number.isInteger(this.config.maxMessages) && this.config.maxMessages > 0
       ? this.config.maxMessages
       : this.defaults.maxMessages;
+  },
+
+  sendQueueCommand(command) {
+    this.sendSocketNotification("MC_QUEUE_COMMAND", command);
   },
 
   getImageCacheLimits() {
@@ -1099,13 +1180,15 @@ Module.register("MMM-MessageCenter", {
       left.priority === right.priority &&
       left.urgency === right.urgency &&
       left.retention === right.retention &&
+      left.unread === right.unread &&
       left.expires === right.expires &&
+      left.transportManaged === right.transportManaged &&
       JSON.stringify(left.image) === JSON.stringify(right.image) &&
       JSON.stringify(left.actions) === JSON.stringify(right.actions)
     );
   },
 
-  normalizeMessage(raw) {
+  normalizeMessage(raw, options = {}) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
 
     const now = Date.now();
@@ -1151,10 +1234,13 @@ Module.register("MMM-MessageCenter", {
       urgency,
       retention,
       timestamp,
-      unread: urgency !== "passive" && retention !== "ephemeral",
+      unread: options.honorState && typeof raw.unread === "boolean"
+        ? raw.unread
+        : urgency !== "passive" && retention !== "ephemeral",
       expires,
       actions,
-      image
+      image,
+      transportManaged: options.transportManaged === true
     };
   },
 
