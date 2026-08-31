@@ -4,6 +4,12 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Add `showSummary` so non-interactive regions can hide the unread/total badge
+  without removing the Messages heading. The existing summary remains enabled
+  by default for compatibility.
+
 ### Fixed
 
 - Keep expiration checks active while MagicMirror hides or suspends the module,
