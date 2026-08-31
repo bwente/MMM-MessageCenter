@@ -21,6 +21,7 @@ Module.register("MMM-MessageCenter", {
     syncInterval: 15000,
     publishAttentionState: true,
     showHeader: true,
+    showSummary: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
     internalNotifications: {
@@ -284,20 +285,24 @@ Module.register("MMM-MessageCenter", {
     title.textContent = this.translate("MESSAGES");
     heading.appendChild(title);
 
-    const count = document.createElement("span");
-    count.className = "messages-count";
     const counts = this.getMessageCounts();
-    count.textContent = counts.unread
-      ? this.translate("NEW_TOTAL", { unread: counts.unread, total: counts.total })
-      : this.translate(counts.total === 1 ? "ONE_MESSAGE" : "MESSAGE_COUNT", { total: counts.total });
-    count.setAttribute(
-      "aria-label",
-      counts.unread
-        ? this.translate("UNREAD_TOTAL_ARIA", { unread: counts.unread, total: counts.total })
-        : this.translate("NONE_UNREAD_ARIA", { total: counts.total })
-    );
-    if (counts.unread) count.classList.add("has-unread");
-    heading.appendChild(count);
+    if (this.config.showSummary !== false) {
+      const count = document.createElement("span");
+      count.className = "messages-count";
+      count.textContent = counts.unread
+        ? this.translate("NEW_TOTAL", { unread: counts.unread, total: counts.total })
+        : this.translate(counts.total === 1 ? "ONE_MESSAGE" : "MESSAGE_COUNT", {
+          total: counts.total
+        });
+      count.setAttribute(
+        "aria-label",
+        counts.unread
+          ? this.translate("UNREAD_TOTAL_ARIA", { unread: counts.unread, total: counts.total })
+          : this.translate("NONE_UNREAD_ARIA", { total: counts.total })
+      );
+      if (counts.unread) count.classList.add("has-unread");
+      heading.appendChild(count);
+    }
     header.appendChild(heading);
 
     const showControls = this.shouldShowMessageControls();

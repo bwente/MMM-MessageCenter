@@ -84,6 +84,8 @@ and time. It does not require MMM-pages or any hardware integration:
     displayMode: "line",
     maxVisibleMessages: 3,
     lineShowBody: false,
+    showControls: false,
+    showSummary: false,
     pages: false
   }
 },
@@ -93,6 +95,11 @@ Set `lineShowBody: true` to add one truncated body line below each title. Line
 mode intentionally omits images, source labels, and controls. The complete
 bounded queue remains available internally, and other modules can still use
 `MC_ACK_ALL`, `MC_CLEAR_READ`, and `MC_CLEAR_ALL`.
+
+The recommended non-interactive configuration hides the unread/total summary
+because the visible rows and urgency edges already communicate the useful
+state. Keep `showSummary: true` when the count is useful, such as when retained
+history may exceed `maxVisibleMessages`.
 
 Use `displayMode: "compact"` when the region should show small cards with body
 text, source labels, and image thumbnails. The same `maxVisibleMessages` option
@@ -122,6 +129,7 @@ sets the visible count in compact mode. Its history buttons remain hidden unless
     syncInterval: 15000,
     publishAttentionState: true,
     showHeader: true,
+    showSummary: true,
     showToasts: true,
     clearAttentionWhenViewed: true,
     internalNotifications: {
@@ -185,7 +193,8 @@ for its complete page layout syntax.
 | `expirationSweepInterval` | number | `60000` | Milliseconds between active expiration checks; use `0` to disable. |
 | `syncInterval` | number | `15000` | Milliseconds between display synchronization requests. This recovers messages after a browser or socket reconnect; use `0` to disable periodic synchronization. |
 | `publishAttentionState` | boolean | `true` | Publish structured `MESSAGE_CENTER_ATTENTION_CHANGED` snapshots. |
-| `showHeader` | boolean | `true` | Show the inbox title, explicit unread/total counts, and touch-friendly history controls. |
+| `showHeader` | boolean | `true` | Show the header containing the inbox title and any enabled summary or history controls. |
+| `showSummary` | boolean | `true` | Show the unread/total summary beside the title. Set to `false` for a quieter non-interactive region. |
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
 | `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |

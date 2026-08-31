@@ -216,6 +216,34 @@ test("supports non-touch presentation without removing the header", () => {
   assert.equal(line.shouldShowMessageControls(), false);
 });
 
+test("allows non-interactive displays to hide the summary without hiding the title", () => {
+  const module = instance({
+    displayMode: "line",
+    showControls: false,
+    showSummary: false
+  });
+  module.messages = [module.normalizeMessage({
+    id: "one",
+    title: "Expiration test",
+    urgency: "attention",
+    retention: "untilViewed"
+  })];
+
+  const header = withFakeDocument(() => module.getHeaderDom());
+
+  assert.equal(elementsByClass(header, "messages-title").length, 1);
+  assert.equal(elementsByClass(header, "messages-count").length, 0);
+});
+
+test("shows the message summary by default", () => {
+  const module = instance({ displayMode: "line" });
+  module.messages = [module.normalizeMessage({ id: "one", title: "One" })];
+
+  const header = withFakeDocument(() => module.getHeaderDom());
+
+  assert.equal(elementsByClass(header, "messages-count").length, 1);
+});
+
 test("line mode shows optional body text but never images", () => {
   const titlesOnly = instance({ displayMode: "line" });
   const withBody = instance({ displayMode: "line", lineShowBody: true });
