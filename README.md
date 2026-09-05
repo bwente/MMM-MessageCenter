@@ -299,6 +299,32 @@ normal schema. This adds stable IDs, urgency, retention, expiration, actions,
 and update semantics without requiring a bundled adapter. `MC_MESSAGE` remains
 supported for compatibility.
 
+Providers that maintain an authoritative set of active events can send
+`MESSAGE_CENTER_SYNC`. A successful snapshot adds or updates its entries and
+removes stored messages from that source when their IDs are no longer present:
+
+```js
+this.sendNotification("MESSAGE_CENTER_SYNC", {
+  source: "official-alert-provider",
+  showToasts: false,
+  messages: activeAlerts.map((alert) => ({
+    id: alert.id,
+    type: "weather.alert",
+    title: alert.title,
+    body: alert.description,
+    urgency: alert.urgency,
+    retention: alert.retention,
+    expires: alert.expires
+  }))
+});
+```
+
+Snapshots are limited to 100 messages and rejected as a whole when malformed
+or when an entry claims a conflicting source. Source modules remain responsible
+for fetching data, location and credentials, relevance rules, and severity
+mapping. MessageCenter only normalizes, routes, presents, and resolves the
+resulting messages.
+
 For notifications whose existing payload contains richer lifecycle meaning,
 MessageCenter can provide a focused bundled adapter. See the
 [module integration guide](docs/ADAPTERS.md). If a module is not captured—or

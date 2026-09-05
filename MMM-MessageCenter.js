@@ -624,6 +624,21 @@ Module.register("MMM-MessageCenter", {
     return String(value).replace(/^MMM-/, "").replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "module";
   },
 
+  handleProviderNotification(notification, payload, sender) {
+    return globalThis.MessageCenterAdapters?.get("standard-message")
+      ?.handle(this, notification, payload, sender) || false;
+  },
+
+  isProviderMessage(payload, expectedSource = null) {
+    return globalThis.MessageCenterAdapters?.get("standard-message")
+      ?.isProviderMessage(payload, expectedSource) || false;
+  },
+
+  syncSourceMessages(source, activeIds) {
+    return globalThis.MessageCenterAdapters?.get("standard-message")
+      ?.syncSourceMessages(this, source, activeIds) || false;
+  },
+
   isPublicTransportHubSender(sender) {
     return this.isSender(sender, "MMM-PublicTransportHub");
   },

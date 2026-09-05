@@ -39,6 +39,29 @@ this.sendNotification("MESSAGE_CENTER_MESSAGE", {
 
 `MC_MESSAGE` remains supported as a shorter compatibility name.
 
+Providers with an authoritative active set can use `MESSAGE_CENTER_SYNC` to
+update current entries and automatically resolve IDs that disappear:
+
+```js
+this.sendNotification("MESSAGE_CENTER_SYNC", {
+  source: "official-alert-provider",
+  showToasts: false,
+  messages: activeAlerts.map((alert) => ({
+    id: alert.id,
+    type: "weather.alert",
+    title: alert.title,
+    body: alert.description,
+    urgency: alert.urgency,
+    retention: alert.retention,
+    expires: alert.expires
+  }))
+});
+```
+
+Snapshots are limited to 100 entries and rejected before reconciliation if any
+entry is malformed or claims a different source. The provider remains
+responsible for retrieving data and deciding relevance and severity.
+
 ## Bundled adapters
 
 Adapters improve existing module notifications without requiring changes to
