@@ -1504,6 +1504,88 @@ test("standard message ingestion can be disabled independently", () => {
   assert.equal(module.messages.length, 0);
 });
 
+test("synchronizes an authoritative provider snapshot and resolves missing ids", () => {
+  const module = instance();
+  module.receiveMessage({
+    id: "ended-alert",
+    source: "official-alert-provider",
+    title: "Earlier advisory",
+    urgency: "attention"
+  });
+  module.receiveMessage({
+    id: "keep-this",
+    source: "another-provider",
+    title: "Unrelated message"
+  });
+  module.notifications.length = 0;
+
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "official-alert-provider",
+    showToasts: false,
+    messages: [{
+      id: "active-warning",
+      type: "weather.alert",
+      title: "Tornado Warning",
+      urgency: "critical",
+      retention: "untilAcknowledged",
+      expires: Date.now() + 3600000
+    }]
+  }, { name: "MMM-OfficialAlerts" });
+
+  assert.deepEqual(
+    module.messages.map(({ source, id }) => `${source}/${id}`).sort(),
+    ["another-provider/keep-this", "official-alert-provider/active-warning"]
+  );
+  assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+});
+
+test("an empty provider snapshot resolves every active message from its source", () => {
+  const module = instance();
+  module.receiveMessage({ id: "one", source: "service-provider", title: "Disruption" });
+
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "service-provider",
+    messages: []
+  }, { name: "MMM-ServiceProvider" });
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("rejects malformed or oversized provider snapshots without clearing history", () => {
+  const module = instance();
+  module.receiveMessage({ id: "active", source: "official-alert-provider", title: "Flood Warning" });
+  const oversized = Array.from({ length: 101 }, (_, index) => ({
+    id: `alert-${index}`,
+    title: `Alert ${index}`
+  }));
+
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "official-alert-provider",
+    messages: [{ id: "missing-title" }]
+  }, { name: "MMM-OfficialAlerts" });
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "official-alert-provider",
+    messages: oversized
+  }, { name: "MMM-OfficialAlerts" });
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "official-alert-provider",
+    messages: [{ id: "wrong-source", source: "another-provider", title: "Wrong" }]
+  }, { name: "MMM-OfficialAlerts" });
+
+  assert.deepEqual(module.messages.map(({ id }) => id), ["active"]);
+});
+
+test("prevents recursive provider snapshots from MessageCenter", () => {
+  const module = instance();
+
+  module.notificationReceived("MESSAGE_CENTER_SYNC", {
+    source: "message-center",
+    messages: [{ id: "loop", title: "Do not ingest" }]
+  }, { name: "MMM-MessageCenter" });
+
+  assert.equal(module.messages.length, 0);
+});
+
 test("generic mappings remain an explicit configurable allowlist", () => {
   const module = instance({
     internalNotifications: {

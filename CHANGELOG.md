@@ -16,6 +16,8 @@ All notable changes to MMM-MessageCenter are documented in this file.
   allowlist and recursion prevention.
 - Accept `MESSAGE_CENTER_MESSAGE` from any ordinary MagicMirror module as the
   preferred rich integration API while retaining `MC_MESSAGE` compatibility.
+- Add provider-neutral `MESSAGE_CENTER_SYNC` snapshots for safely updating an
+  authoritative active set and resolving source messages no longer present.
 - Add module integration documentation and an adapter-request issue template
   so enhanced integrations can be proposed and maintained in MessageCenter.
 
