@@ -1,0 +1,283 @@
+{
+  "schema": {
+    "MMM-MessageCenter": {
+      "type": "object",
+      "title": "MMM-MessageCenter",
+      "properties": {
+        "module": { "type": "string", "default": "MMM-MessageCenter", "readonly": true },
+        "disabled": { "type": "boolean", "default": false },
+        "position": { "type": "string", "default": "bottom_left", "readonly": true },
+        "classes": { "type": "string", "default": "" },
+        "header": { "type": "string", "default": "" },
+        "animateIn": { "type": "string", "default": "None" },
+        "animateOut": { "type": "string", "default": "None" },
+        "hiddenOnStartup": { "type": "boolean", "default": false },
+        "configDeepMerge": { "type": "boolean", "default": true },
+        "order": { "type": "string", "default": "*" },
+        "inconfig": { "type": "string", "default": "0" },
+        "index": { "type": "integer" },
+        "config": {
+          "type": "object",
+          "title": "MessageCenter settings",
+          "properties": {
+            "ui": { "type": "string", "enum": ["messages"], "default": "messages" },
+            "displayMode": { "type": "string", "enum": ["page", "compact", "line"], "default": "page" },
+            "maxVisibleMessages": { "type": "integer", "minimum": 1 },
+            "showControls": { "type": "boolean", "default": true },
+            "compactMaxMessages": { "type": "integer", "minimum": 1, "default": 3 },
+            "compactShowControls": { "type": "boolean", "default": false },
+            "lineMaxMessages": { "type": "integer", "minimum": 1, "default": 3 },
+            "lineShowBody": { "type": "boolean", "default": false },
+            "pages": { "type": "boolean", "default": true },
+            "legacyAttentionEvents": { "type": "boolean", "default": true },
+            "messagesPage": { "type": "integer", "minimum": 0, "default": 4 },
+            "channelRoutes": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 }, "default": {} },
+            "maxMessages": { "type": "integer", "minimum": 1, "default": 50 },
+            "expirationSweepInterval": { "type": "integer", "minimum": 0, "default": 60000 },
+            "syncInterval": { "type": "integer", "minimum": 0, "default": 15000 },
+            "publishAttentionState": { "type": "boolean", "default": true },
+            "showHeader": { "type": "boolean", "default": true },
+            "showSummary": { "type": "boolean", "default": true },
+            "showToasts": { "type": "boolean", "default": true },
+            "clearAttentionWhenViewed": { "type": "boolean", "default": true },
+            "internalNotifications": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "standard": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } },
+                "generic": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": true },
+                    "mappings": { "type": "object", "additionalProperties": true }
+                  }
+                },
+                "remoteControl": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": true },
+                    "mappings": { "type": "object", "additionalProperties": true }
+                  }
+                },
+                "weather": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "rain": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": { "type": "boolean", "default": true },
+                        "messageId": { "type": "string", "default": "rain-next-hour" },
+                        "source": { "type": "string", "default": "magicmirror.weather" },
+                        "entityId": { "type": "string", "default": "local-weather" },
+                        "leadTimeMinutes": { "type": "integer", "minimum": 1, "default": 60 },
+                        "windowMinutes": { "type": "integer", "minimum": 1, "default": 45 },
+                        "probabilityThreshold": { "type": "number", "minimum": 0, "maximum": 100, "default": 50 },
+                        "amountThreshold": { "type": "number", "minimum": 0, "default": 0.1 },
+                        "urgency": { "type": "string", "enum": ["passive", "attention", "critical"], "default": "attention" },
+                        "retention": { "type": "string", "enum": ["ephemeral", "archive", "untilViewed", "untilAcknowledged"], "default": "untilViewed" },
+                        "channel": { "type": "string", "default": "weather" },
+                        "timeout": { "type": "integer", "minimum": 0, "default": 10000 },
+                        "expiresAfterMinutes": { "type": "integer", "minimum": 1, "default": 90 }
+                      }
+                    }
+                  }
+                },
+                "publicTransportHub": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } }
+              }
+            },
+            "webhook": {
+              "type": "object",
+              "properties": {
+                "host": { "type": "string", "default": "127.0.0.1" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8787 },
+                "token": { "type": "string", "default": "" }
+              }
+            },
+            "transports": {
+              "type": "object",
+              "properties": {
+                "mqtt": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "url": { "type": "string", "default": "mqtt://127.0.0.1:1883" },
+                    "topic": { "type": "string", "default": "messagecenter/messages" },
+                    "topics": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                    "username": { "type": "string", "default": "" },
+                    "password": { "type": "string", "default": "" },
+                    "clientId": { "type": "string", "default": "" }
+                  }
+                },
+                "unixSocket": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "path": { "type": "string", "default": "/tmp/mmm-messagecenter.sock" },
+                    "mode": { "type": "integer", "minimum": 0, "maximum": 511, "default": 384 }
+                  }
+                }
+              }
+            },
+            "images": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": false },
+                "maxBytes": { "type": "integer", "minimum": 1024, "maximum": 5242880, "default": 1048576 },
+                "maxCachedImages": { "type": "integer", "minimum": 0, "default": 12 },
+                "maxTotalBytes": { "type": "integer", "minimum": 0, "default": 12582912 },
+                "timeout": { "type": "integer", "minimum": 1, "default": 5000 },
+                "allowPrivateHosts": { "type": "boolean", "default": false },
+                "allowHttp": { "type": "boolean", "default": false }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "form": [
+    { "key": "MMM-MessageCenter.disabled", "title": "Disable module", "description": "Keep the configuration but do not load MessageCenter." },
+    { "key": "MMM-MessageCenter.position", "title": "Position", "description": "Use the Module Positions section to change this value." },
+    { "key": "MMM-MessageCenter.classes", "title": "Additional CSS classes" },
+    { "key": "MMM-MessageCenter.header", "title": "MagicMirror region header" },
+    { "key": "MMM-MessageCenter.animateIn", "title": "Show animation", "description": "Optional MagicMirror animation name. Leave as None for no animation." },
+    { "key": "MMM-MessageCenter.animateOut", "title": "Hide animation", "description": "Optional MagicMirror animation name. Leave as None for no animation." },
+    { "key": "MMM-MessageCenter.hiddenOnStartup", "title": "Hidden on startup" },
+    { "key": "MMM-MessageCenter.configDeepMerge", "type": "hidden" },
+    { "key": "MMM-MessageCenter.order", "type": "hidden" },
+    { "key": "MMM-MessageCenter.inconfig", "type": "hidden" },
+    { "key": "MMM-MessageCenter.index", "type": "hidden" },
+    {
+      "type": "fieldset",
+      "title": "config",
+      "items": [
+        {
+          "type": "fieldset", "title": "Display", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.displayMode", "title": "Display mode", "titleMap": { "page": "Full page", "compact": "Compact cards", "line": "Line list" } },
+            { "key": "MMM-MessageCenter.config.maxVisibleMessages", "title": "Maximum visible messages", "description": "Leave empty to use the mode default without limiting retained history." },
+            { "key": "MMM-MessageCenter.config.showHeader", "title": "Show Messages heading" },
+            { "key": "MMM-MessageCenter.config.showSummary", "title": "Show unread and total summary" },
+            { "key": "MMM-MessageCenter.config.showControls", "title": "Show interactive controls" },
+            { "key": "MMM-MessageCenter.config.compactShowControls", "title": "Show controls in compact mode" },
+            { "key": "MMM-MessageCenter.config.lineShowBody", "title": "Show body in line mode" },
+            { "key": "MMM-MessageCenter.config.showToasts", "title": "Show incoming-message toasts" }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Message history and attention", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.maxMessages", "title": "Maximum retained messages" },
+            { "key": "MMM-MessageCenter.config.clearAttentionWhenViewed", "title": "Mark attention messages viewed when opened" },
+            { "key": "MMM-MessageCenter.config.publishAttentionState", "title": "Publish structured attention state" },
+            { "key": "MMM-MessageCenter.config.legacyAttentionEvents", "title": "Publish legacy attention events" },
+            { "key": "MMM-MessageCenter.config.expirationSweepInterval", "title": "Expiration check interval (milliseconds)" },
+            { "key": "MMM-MessageCenter.config.syncInterval", "title": "Display synchronization interval (milliseconds)" }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "MagicMirror notifications", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.internalNotifications.enabled", "title": "Receive internal notifications" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.standard.enabled", "title": "Standard MessageCenter API" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.generic.enabled", "title": "Automatic common alert capture" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.remoteControl.enabled", "title": "MMM-Remote-Control adapter" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.publicTransportHub.enabled", "title": "MMM-PublicTransportHub adapter" }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Rain approaching", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.enabled", "title": "Enable weather integration" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.enabled", "title": "Enable rain alerts" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.leadTimeMinutes", "title": "Look-ahead time (minutes)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.windowMinutes", "title": "Forecast matching window (minutes)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.probabilityThreshold", "title": "Probability threshold (percent)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.amountThreshold", "title": "Precipitation amount threshold" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.urgency", "title": "Urgency" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.retention", "title": "Retention" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.expiresAfterMinutes", "title": "Expire after forecast time (minutes)" }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Page routing", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.pages", "title": "Enable MMM-pages routing" },
+            { "key": "MMM-MessageCenter.config.messagesPage", "title": "Messages page index" },
+            { "key": "MMM-MessageCenter.config.channelRoutes", "title": "Channel routes", "type": "ace", "aceMode": "json", "aceTheme": "twilight", "height": "100px", "description": "Advanced JSON object mapping semantic channel names to page indexes." }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "REST webhook", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.webhook.host", "title": "Listen address", "description": "127.0.0.1 is local-only. Use 0.0.0.0 only for a trusted local network." },
+            { "key": "MMM-MessageCenter.config.webhook.port", "title": "Port" },
+            { "key": "MMM-MessageCenter.config.webhook.token", "title": "Bearer token", "type": "password", "description": "Recommended whenever the webhook is reachable from the local network." }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "MQTT", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.transports.mqtt.enabled", "title": "Enable MQTT" },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.url", "title": "Broker URL" },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.topic", "title": "Topic", "description": "Used when the multiple-topics list is empty." },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.topics", "title": "Multiple topics", "type": "array", "description": "Optional list of exact topics. When populated, this replaces the single topic above.", "items": [{ "key": "MMM-MessageCenter.config.transports.mqtt.topics[]", "title": "Topic" }] },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.username", "title": "Username" },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.password", "title": "Password", "type": "password" },
+            { "key": "MMM-MessageCenter.config.transports.mqtt.clientId", "title": "Client ID", "description": "Optional stable MQTT client identifier." }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Local Unix socket", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.transports.unixSocket.enabled", "title": "Enable Unix socket" },
+            { "key": "MMM-MessageCenter.config.transports.unixSocket.path", "title": "Socket path" },
+            { "key": "MMM-MessageCenter.config.transports.unixSocket.mode", "title": "Permissions (decimal)", "description": "384 is equivalent to owner-only 0600 permissions." }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Image snapshots", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.images.enabled", "title": "Enable image snapshots" },
+            { "key": "MMM-MessageCenter.config.images.maxCachedImages", "title": "Maximum cached images" },
+            { "key": "MMM-MessageCenter.config.images.maxBytes", "title": "Maximum bytes per image" },
+            { "key": "MMM-MessageCenter.config.images.maxTotalBytes", "title": "Maximum total image bytes" },
+            { "key": "MMM-MessageCenter.config.images.timeout", "title": "Download timeout (milliseconds)" },
+            { "key": "MMM-MessageCenter.config.images.allowPrivateHosts", "title": "Allow private or local image hosts" },
+            { "key": "MMM-MessageCenter.config.images.allowHttp", "title": "Allow unencrypted HTTP images" }
+          ]
+        },
+        {
+          "type": "fieldset", "title": "Advanced compatibility", "expandable": true,
+          "items": [
+            { "key": "MMM-MessageCenter.config.ui", "title": "UI route" },
+            { "key": "MMM-MessageCenter.config.compactMaxMessages", "title": "Legacy compact message limit" },
+            { "key": "MMM-MessageCenter.config.lineMaxMessages", "title": "Legacy line message limit" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.generic.mappings", "title": "Generic notification mappings", "type": "ace", "aceMode": "json", "aceTheme": "twilight", "height": "140px" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.remoteControl.mappings", "title": "Remote Control mappings", "type": "ace", "aceMode": "json", "aceTheme": "twilight", "height": "180px" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.messageId", "title": "Rain message ID" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.source", "title": "Rain source" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.entityId", "title": "Rain entity ID" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.channel", "title": "Rain page channel" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.weather.rain.timeout", "title": "Rain page timeout (milliseconds)" }
+          ]
+        }
+      ]
+    }
+  ],
+  "value": {
+    "module": "MMM-MessageCenter",
+    "disabled": true,
+    "position": "bottom_left",
+    "classes": "",
+    "header": "",
+    "animateIn": "None",
+    "animateOut": "None",
+    "hiddenOnStartup": false,
+    "configDeepMerge": true,
+    "order": "*",
+    "inconfig": "0",
+    "config": {}
+  }
+}

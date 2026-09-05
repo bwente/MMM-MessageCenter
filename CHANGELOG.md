@@ -4,6 +4,22 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ## Unreleased
 
+## 0.6.0 - 2026-09-05
+
+### Added
+
+- Add a module-owned MMM-Config schema with grouped display, message,
+  integration, weather, routing, transport, image, and advanced settings.
+- Add friendly enumerated choices and numeric validation while masking webhook
+  and MQTT credential fields in the generated configuration form.
+- Add automated coverage ensuring every MessageCenter default remains present
+  in the schema and every schema leaf remains represented in the form.
+
+### Documentation
+
+- Document that MMM-Config support is optional, requires no runtime coupling,
+  and continues to edit the standard MagicMirror configuration.
+
 ## 0.5.0 - 2026-09-05
 
 ### Added
