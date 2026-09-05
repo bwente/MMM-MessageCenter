@@ -21,6 +21,7 @@
   "RAIN_EXPECTED_NEAR": "Regen wird in der Nähe von {location} gegen {time} erwartet.",
   "SOURCE_WEATHER": "Wetter",
   "SOURCE_REMOTE_CONTROL": "Fernsteuerung",
+  "SOURCE_PUBLIC_TRANSPORT_HUB": "Öffentlicher Verkehr",
   "SOURCE_HOME_ASSISTANT": "Home Assistant",
   "SOURCE_SMARTTHINGS_HOME_ASSISTANT": "SmartThings über Home Assistant",
   "SOURCE_SMARTTHINGS": "SmartThings"

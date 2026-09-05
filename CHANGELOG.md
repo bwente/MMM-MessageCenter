@@ -4,11 +4,24 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ## Unreleased
 
+## 0.4.0 - 2026-09-05
+
 ### Added
 
 - Add `showSummary` so non-interactive regions can hide the unread/total badge
   without removing the Messages heading. The existing summary remains enabled
   by default for compatibility.
+- Add an optional MMM-PublicTransportHub adapter for normalized
+  `PTH_SERVICE_ALERT` events. New alerts create attention and a toast, stable-ID
+  updates replace content silently while preserving read state, and resolved
+  alerts are removed.
+- Add translated Public Transport source labels in English, German, Spanish,
+  and French while preserving sender-authored alert titles and bodies.
+
+### Changed
+
+- Keep line mode intentionally constrained to its existing single-line title
+  and optional single-line body presentation for service alerts.
 
 ### Fixed
 

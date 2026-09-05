@@ -136,6 +136,9 @@ sets the visible count in compact mode. Its history buttons remain hidden unless
       remoteControl: {
         enabled: true
       },
+      publicTransportHub: {
+        enabled: true
+      },
       weather: {
         enabled: true
       }
@@ -200,6 +203,7 @@ for its complete page layout syntax.
 | `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |
 | `internalNotifications.remoteControl.enabled` | boolean | `true` | Capture the calm default allowlist of user-facing MMM-Remote-Control notifications. |
 | `internalNotifications.remoteControl.mappings` | object | See below | Explicit allowlist and normalization policy for notifications emitted by MMM-Remote-Control. |
+| `internalNotifications.publicTransportHub.enabled` | boolean | `true` | Accept normalized `PTH_SERVICE_ALERT` broadcasts from MMM-PublicTransportHub. The sending feature remains disabled by default in that module. |
 | `internalNotifications.weather.enabled` | boolean | `false` | Convert eligible default-weather forecasts into MessageCenter alerts. |
 | `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. The secure default accepts only software running on the mirror. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
@@ -319,6 +323,33 @@ module visibility, page navigation, and MessageCenter's own emitted events are
 not captured. Replace `mappings` with a deliberately chosen mapping object to
 change the allowlist; use `{}` to capture nothing while leaving the provider
 available.
+
+### MMM-PublicTransportHub
+
+[MMM-PublicTransportHub](https://github.com/KristjanESPERANTO/MMM-PublicTransportHub)
+can emit provider-neutral `PTH_SERVICE_ALERT` notifications for meaningful
+delays, cancellations, service remarks, and an optional no-departures state.
+Enable `outgoingNotifications` in that module; MessageCenter's receiving adapter
+is enabled by default and can be disabled independently:
+
+```js
+internalNotifications: {
+  publicTransportHub: {
+    enabled: true
+  }
+}
+```
+
+MessageCenter treats the first active event as an attention message and toast.
+Later updates with the same stable ID replace its content silently and preserve
+its read state. A matching event with `active: false` removes the message and
+clears its attention contribution. Sender-provided titles and bodies remain
+unchanged, so transit alerts should use concise, self-contained titles that are
+useful in line mode. Compact and full-page modes can show the longer body.
+
+The adapter consumes only normalized events and does not interpret provider
+responses, delays, routes, or service remarks itself. Both modules continue to
+operate independently when the other is absent.
 
 ### Rain approaching
 
