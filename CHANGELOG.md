@@ -25,6 +25,8 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ### Fixed
 
+- Update the locked `qs` transitive dependency to 6.16.0 to address its
+  published request-parsing denial-of-service advisories.
 - Keep expiration checks active while MagicMirror hides or suspends the module,
   restore a missing sweep when retained history arrives, and recheck expiration
   when the module resumes or Electron becomes visible again. Expiration now uses
