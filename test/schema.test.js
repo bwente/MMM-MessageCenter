@@ -20,7 +20,7 @@ function assertDefaultCoverage(defaults, schema, path = "config") {
     const property = schema.properties?.[key];
     assert.ok(property, `Missing schema property ${path}.${key}`);
     if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length) {
-      if (property.additionalProperties) continue;
+      assert.ok(property.properties, `Missing nested schema properties for ${path}.${key}`);
       assertDefaultCoverage(value, property, `${path}.${key}`);
     }
   }
@@ -70,6 +70,7 @@ test("MMM-Config form exposes each configurable property", () => {
   const collect = (schema, prefix = "") => {
     for (const [key, property] of Object.entries(schema.properties || {})) {
       const path = prefix ? `${prefix}.${key}` : key;
+      if (keys.has(path)) continue;
       if (property.properties) collect(property, path);
       else assert.ok(keys.has(path), `Missing form field for config.${path}`);
     }

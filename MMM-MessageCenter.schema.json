@@ -56,7 +56,28 @@
                   "type": "object",
                   "properties": {
                     "enabled": { "type": "boolean", "default": true },
-                    "mappings": { "type": "object", "additionalProperties": true }
+                    "mappings": {
+                      "type": "object",
+                      "properties": {
+                        "MC_MESSAGE": {
+                          "type": "object",
+                          "properties": {
+                            "mode": { "type": "string", "default": "message" }
+                          }
+                        },
+                        "SHOW_ALERT": {
+                          "type": "object",
+                          "properties": {
+                            "mode": { "type": "string", "default": "alert" },
+                            "type": { "type": "string", "default": "remote.alert" },
+                            "source": { "type": "string", "default": "magicmirror.remote-control" },
+                            "urgency": { "type": "string", "enum": ["passive", "attention", "critical"], "default": "passive" },
+                            "retention": { "type": "string", "enum": ["ephemeral", "archive", "untilViewed", "untilAcknowledged"], "default": "archive" }
+                          }
+                        }
+                      },
+                      "additionalProperties": true
+                    }
                   }
                 },
                 "weather": {
