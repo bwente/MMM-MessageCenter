@@ -21,6 +21,12 @@ global.Module = {
 };
 global.Log = { info() {}, warn() {}, error() {} };
 
+require("../integrations/adapter-registry.js");
+require("../integrations/standard-message.js");
+require("../integrations/remote-control.js");
+require("../integrations/public-transport-hub.js");
+require("../integrations/weather.js");
+require("../integrations/generic-alert.js");
 require("../MMM-MessageCenter.js");
 
 function instance(config = {}) {
@@ -133,6 +139,17 @@ test("provides the complete English translation entry point", () => {
     assert.equal(typeof translations[key], "string");
     assert.notEqual(translations[key], "");
   }
+});
+
+test("loads the ordered internal notification adapter registry", () => {
+  assert.deepEqual(definition.getScripts(), [
+    "integrations/adapter-registry.js",
+    "integrations/standard-message.js",
+    "integrations/remote-control.js",
+    "integrations/public-transport-hub.js",
+    "integrations/weather.js",
+    "integrations/generic-alert.js"
+  ]);
 });
 
 test("defaults to the full page display mode", () => {
@@ -1401,6 +1418,127 @@ test("does not ingest MessageCenter notifications as Remote Control messages", (
     { active: true },
     { name: "MMM-Remote-Control" }
   );
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("accepts the standard message API from any ordinary MagicMirror module", () => {
+  const module = instance();
+
+  module.notificationReceived("MESSAGE_CENTER_MESSAGE", {
+    id: "laundry-ready",
+    type: "appliance.complete",
+    source: "magicmirror.laundry",
+    title: "Laundry",
+    body: "The dryer is finished.",
+    urgency: "attention",
+    retention: "untilViewed"
+  }, { name: "MMM-Laundry" });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].id, "laundry-ready");
+  assert.equal(module.messages[0].source, "magicmirror.laundry");
+});
+
+test("captures ordinary module alerts through the generic fallback", () => {
+  const module = instance();
+
+  module.notificationReceived("SHOW_ALERT", {
+    title: "Garage door",
+    message: "The garage door is still open."
+  }, { name: "MMM-GarageDoor" });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].type, "module.alert");
+  assert.equal(module.messages[0].source, "magicmirror.garage-door");
+  assert.equal(module.messages[0].title, "Garage door");
+  assert.equal(module.messages[0].body, "The garage door is still open.");
+  assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+});
+
+test("uses a translated fallback title for a body-only generic alert", () => {
+  const module = instance();
+  module.translate = createTranslator(germanTranslations);
+
+  module.notificationReceived("SHOW_NOTIFICATION", {
+    message: "Ein Fenster ist geöffnet."
+  }, { data: { module: "MMM-WindowMonitor" } });
+
+  assert.equal(module.messages[0].title, "Modulwarnung");
+  assert.equal(module.messages[0].body, "Ein Fenster ist geöffnet.");
+  assert.equal(module.messages[0].source, "magicmirror.window-monitor");
+});
+
+test("specific adapters take precedence over the generic fallback", () => {
+  const module = instance();
+
+  module.notificationReceived("SHOW_ALERT", {
+    title: "Remote alert",
+    message: "Handled by the Remote Control adapter."
+  }, { name: "MMM-Remote-Control" });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].type, "remote.alert");
+  assert.equal(module.messages[0].source, "magicmirror.remote-control");
+});
+
+test("generic capture can be disabled without disabling bundled adapters", () => {
+  const module = instance({ internalNotifications: { generic: { enabled: false } } });
+
+  module.notificationReceived("SHOW_ALERT", {
+    title: "Ignore",
+    message: "Generic capture is disabled."
+  }, { name: "MMM-Example" });
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("standard message ingestion can be disabled independently", () => {
+  const module = instance({ internalNotifications: { standard: { enabled: false } } });
+
+  module.notificationReceived("MESSAGE_CENTER_MESSAGE", {
+    title: "Ignore",
+    body: "The standard API is disabled."
+  }, { name: "MMM-Example" });
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("generic mappings remain an explicit configurable allowlist", () => {
+  const module = instance({
+    internalNotifications: {
+      generic: {
+        mappings: {
+          HOUSEHOLD_NOTICE: {
+            type: "household.notice",
+            urgency: "attention",
+            retention: "untilViewed"
+          }
+        }
+      }
+    }
+  });
+
+  module.notificationReceived("SHOW_ALERT", { title: "Not allowed" }, { name: "MMM-Example" });
+  module.notificationReceived("HOUSEHOLD_NOTICE", {
+    title: "Bins tonight",
+    body: "Put the recycling bin outside."
+  }, { name: "MMM-Chores" });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].type, "household.notice");
+  assert.equal(module.messages[0].urgency, "attention");
+});
+
+test("generic capture ignores malformed, operational, and recursive events", () => {
+  const module = instance();
+
+  module.notificationReceived("SHOW_ALERT", {}, { name: "MMM-Example" });
+  module.notificationReceived("REMOTE_ACTION", { action: "REFRESH" }, { name: "MMM-Example" });
+  module.notificationReceived("SHOW_ALERT", {
+    title: "Own toast",
+    message: "Do not ingest this."
+  }, { name: "MMM-MessageCenter" });
 
   assert.equal(module.messages.length, 0);
 });

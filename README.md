@@ -201,6 +201,9 @@ for its complete page layout syntax.
 | `showToasts` | boolean | `true` | Send `SHOW_ALERT` for incoming messages. |
 | `clearAttentionWhenViewed` | boolean | `true` | Mark messages read when their page opens. |
 | `internalNotifications.enabled` | boolean | `true` | Allow configured providers to consume MagicMirror module notifications. |
+| `internalNotifications.standard.enabled` | boolean | `true` | Accept the standard `MESSAGE_CENTER_MESSAGE` and compatibility `MC_MESSAGE` API from MagicMirror modules. |
+| `internalNotifications.generic.enabled` | boolean | `true` | Automatically retain valid user-facing `SHOW_ALERT` and `SHOW_NOTIFICATION` broadcasts as passive history. |
+| `internalNotifications.generic.mappings` | object | See below | Replace the conservative generic notification allowlist or its type, source, urgency, and retention defaults. |
 | `internalNotifications.remoteControl.enabled` | boolean | `true` | Capture the calm default allowlist of user-facing MMM-Remote-Control notifications. |
 | `internalNotifications.remoteControl.mappings` | object | See below | Explicit allowlist and normalization policy for notifications emitted by MMM-Remote-Control. |
 | `internalNotifications.publicTransportHub.enabled` | boolean | `true` | Accept normalized `PTH_SERVICE_ALERT` broadcasts from MMM-PublicTransportHub. The sending feature remains disabled by default in that module. |
@@ -269,6 +272,42 @@ rendered newest entries; `maxMessages` remains the hard queue limit.
 MessageCenter can consume MagicMirror's internal module broadcasts directly.
 This keeps the notification experience useful without Home Assistant and lets
 existing modules remain the authoritative data providers.
+
+### Works automatically
+
+Most module authors do not need to add MessageCenter-specific code. By default,
+valid `SHOW_ALERT` and `SHOW_NOTIFICATION` broadcasts from ordinary MagicMirror
+modules are retained as passive history. The generic fallback accepts only
+those named, user-facing events; brightness, refresh, registration, module
+visibility, navigation, presence, and other operational traffic are ignored.
+MessageCenter's own events are also excluded to prevent recursion.
+
+```js
+this.sendNotification("SHOW_ALERT", {
+  title: "Train delayed",
+  message: "The 8:15 service is running 12 minutes late."
+});
+```
+
+The original module or MagicMirror alert presentation remains responsible for
+the immediate toast, so MessageCenter does not repeat it. Disable the fallback
+with `internalNotifications.generic.enabled: false`, or replace its conservative
+`mappings` object when a deployment needs a different explicit allowlist.
+
+Modules that want richer behavior can send `MESSAGE_CENTER_MESSAGE` using the
+normal schema. This adds stable IDs, urgency, retention, expiration, actions,
+and update semantics without requiring a bundled adapter. `MC_MESSAGE` remains
+supported for compatibility.
+
+For notifications whose existing payload contains richer lifecycle meaning,
+MessageCenter can provide a focused bundled adapter. See the
+[module integration guide](docs/ADAPTERS.md). If a module is not captured—or
+could support better updates, resolution, defaults, or source labeling—please
+[open an adapter request](https://github.com/bwente/MMM-MessageCenter/issues/new?template=adapter-request.yml).
+Include the module link, notification name, a sanitized payload, what should be
+shown or ignored, and how the event updates or resolves. Appropriate adapters
+can be added and maintained by MessageCenter; source-module authors do not need
+to implement MessageCenter internals.
 
 ### MMM-Remote-Control
 

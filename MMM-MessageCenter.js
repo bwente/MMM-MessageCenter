@@ -26,6 +26,12 @@ Module.register("MMM-MessageCenter", {
     clearAttentionWhenViewed: true,
     internalNotifications: {
       enabled: true,
+      standard: {
+        enabled: true
+      },
+      generic: {
+        enabled: true
+      },
       remoteControl: {
         enabled: true,
         mappings: {
@@ -95,6 +101,17 @@ Module.register("MMM-MessageCenter", {
 
   getStyles() {
     return ["MMM-MessageCenter.css"];
+  },
+
+  getScripts() {
+    return [
+      "integrations/adapter-registry.js",
+      "integrations/standard-message.js",
+      "integrations/remote-control.js",
+      "integrations/public-transport-hub.js",
+      "integrations/weather.js",
+      "integrations/generic-alert.js"
+    ];
   },
 
   getTranslations() {
@@ -583,30 +600,32 @@ Module.register("MMM-MessageCenter", {
   handleInternalNotification(notification, payload, sender) {
     const internalConfig = this.config.internalNotifications;
     if (!internalConfig || internalConfig.enabled === false) return false;
+    return globalThis.MessageCenterAdapters?.dispatch(this, notification, payload, sender) || false;
+  },
 
-    if (this.isRemoteControlSender(sender)) {
-      return this.handleRemoteControlNotification(notification, payload);
-    }
+  getInternalAdapterConfig(name, fallback = {}) {
+    return { ...fallback, ...(this.config.internalNotifications?.[name] || {}) };
+  },
 
-    if (
-      notification === "PTH_SERVICE_ALERT" &&
-      this.isPublicTransportHubSender(sender)
-    ) {
-      return this.handlePublicTransportHubAlert(payload);
-    }
+  getSenderName(sender) {
+    if (!sender || typeof sender !== "object") return "";
+    return typeof sender.name === "string" ? sender.name : sender.data?.module || "";
+  },
 
-    if (notification === "WEATHER_UPDATED") {
-      return this.handleWeatherUpdated(payload);
-    }
-    return false;
+  isSender(sender, name) {
+    return this.getSenderName(sender) === name;
+  },
+
+  isMessageCenterSender(sender) {
+    return this.isSender(sender, "MMM-MessageCenter");
+  },
+
+  slugifySource(value) {
+    return String(value).replace(/^MMM-/, "").replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "module";
   },
 
   isPublicTransportHubSender(sender) {
-    if (!sender || typeof sender !== "object") return false;
-    return (
-      sender.name === "MMM-PublicTransportHub" ||
-      sender.data?.module === "MMM-PublicTransportHub"
-    );
+    return this.isSender(sender, "MMM-PublicTransportHub");
   },
 
   getPublicTransportHubNotificationConfig() {
@@ -619,55 +638,12 @@ Module.register("MMM-MessageCenter", {
   },
 
   handlePublicTransportHubAlert(payload) {
-    const providerConfig = this.getPublicTransportHubNotificationConfig();
-    if (!providerConfig.enabled) return false;
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
-    if (payload.id === undefined || payload.id === null || String(payload.id).trim() === "") {
-      return false;
-    }
-
-    const source = "magicmirror.public-transport-hub";
-    const id = String(payload.id);
-    if (payload.active === false) return this.resolveMessage(source, id);
-
-    if (typeof payload.title !== "string" || !payload.title.trim()) return false;
-    const existing = this.messages.find(
-      (message) => message.source === source && message.id === id
-    );
-    const types = {
-      cancellation: "transit.cancellation",
-      delay: "transit.delay",
-      remark: "transit.remark",
-      no_departures: "transit.no-departures"
-    };
-
-    return this.receiveMessage(
-      {
-        id,
-        type: types[payload.kind] || "transit.service-alert",
-        source,
-        entityId: payload.tripId || payload.stationId,
-        title: payload.title,
-        body: typeof payload.body === "string" ? payload.body : "",
-        urgency: "attention",
-        retention: "untilViewed",
-        timestamp: payload.timestamp,
-        unread: existing ? existing.unread : true,
-        expires: payload.expires
-      },
-      {
-        honorState: Boolean(existing),
-        showToast: !existing
-      }
-    );
+    return globalThis.MessageCenterAdapters?.get("public-transport-hub")
+      ?.handle(this, "PTH_SERVICE_ALERT", payload) || false;
   },
 
   isRemoteControlSender(sender) {
-    if (!sender || typeof sender !== "object") return false;
-    return (
-      sender.name === "MMM-Remote-Control" ||
-      sender.data?.module === "MMM-Remote-Control"
-    );
+    return this.isSender(sender, "MMM-Remote-Control");
   },
 
   getRemoteControlNotificationConfig() {
@@ -683,156 +659,30 @@ Module.register("MMM-MessageCenter", {
   },
 
   handleRemoteControlNotification(notification, payload) {
-    const config = this.getRemoteControlNotificationConfig();
-    if (
-      !config.enabled ||
-      !config.mappings ||
-      typeof config.mappings !== "object" ||
-      Array.isArray(config.mappings) ||
-      !Object.prototype.hasOwnProperty.call(config.mappings, notification)
-    ) {
-      return false;
-    }
-
-    const mapping = config.mappings[notification];
-    if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return false;
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
-
-    if (mapping.mode === "message") {
-      return this.receiveMessage({
-        ...payload,
-        source: payload.source || "magicmirror.remote-control"
-      });
-    }
-
-    if (mapping.mode !== "alert") return false;
-    const title = payload.title;
-    const body = payload.message ?? payload.body;
-    if (
-      (typeof title !== "string" || !title.trim()) &&
-      (typeof body !== "string" || !body.trim())
-    ) {
-      return false;
-    }
-
-    this.receiveMessage(
-      {
-        id: payload.id,
-        type: mapping.type || "remote.alert",
-        source: mapping.source || "magicmirror.remote-control",
-        entityId: payload.entityId,
-        title: typeof title === "string" && title.trim() ? title : this.translate("REMOTE_ALERT"),
-        body: typeof body === "string" ? body : "",
-        urgency: mapping.urgency,
-        retention: mapping.retention,
-        expires: payload.expires,
-        actions: mapping.actions
-      },
-      { showToast: false }
-    );
-    return true;
+    return globalThis.MessageCenterAdapters?.get("remote-control")
+      ?.handle(this, notification, payload) || false;
   },
 
   handleWeatherUpdated(payload, now = Date.now()) {
-    const weatherConfig = this.getWeatherNotificationConfig();
-    if (!weatherConfig.enabled || !weatherConfig.rain.enabled) return false;
-    if (!payload || !Array.isArray(payload.hourlyArray) || !payload.hourlyArray.length) {
-      return false;
-    }
-
-    const rain = weatherConfig.rain;
-    const forecast = this.findRainForecast(payload.hourlyArray, now, rain);
-    if (!forecast) {
-      return this.resolveMessage(rain.source, rain.messageId);
-    }
-
-    const alreadyTracked = this.messages.some(
-      (message) => message.source === rain.source && message.id === rain.messageId
-    );
-    if (alreadyTracked) return true;
-
-    const forecastTime = this.formatClockTime(forecast.timestamp);
-    this.receiveMessage({
-      id: rain.messageId,
-      type: "weather.precipitation",
-      source: rain.source,
-      entityId: rain.entityId,
-      title: this.translate("RAIN_APPROACHING"),
-      body: payload.locationName
-        ? this.translate("RAIN_EXPECTED_NEAR", { location: String(payload.locationName), time: forecastTime })
-        : this.translate("RAIN_EXPECTED", { time: forecastTime }),
-      urgency: rain.urgency,
-      retention: rain.retention,
-      timestamp: now,
-      expires: forecast.timestamp + rain.expiresAfterMinutes * 60000,
-      actions: {
-        switchChannel: rain.channel,
-        timeout: rain.timeout
-      }
-    });
-    return true;
+    return globalThis.MessageCenterAdapters?.get("weather")
+      ?.handle(this, "WEATHER_UPDATED", payload, undefined, now) || false;
   },
 
   getWeatherNotificationConfig() {
-    const defaults = this.defaults.internalNotifications.weather;
-    const configured = this.config.internalNotifications?.weather || {};
-    return {
-      ...defaults,
-      ...configured,
-      rain: {
-        ...defaults.rain,
-        ...(configured.rain || {})
-      }
-    };
+    return globalThis.MessageCenterAdapters?.get("weather")?.getConfig(this);
   },
 
   findRainForecast(hourlyArray, now, config) {
-    const target = now + config.leadTimeMinutes * 60000;
-    const tolerance = config.windowMinutes * 60000;
-    return hourlyArray
-      .map((entry) => ({
-        entry,
-        timestamp: this.getWeatherTimestamp(entry?.date)
-      }))
-      .filter(
-        ({ entry, timestamp }) =>
-          timestamp !== null &&
-          timestamp > now &&
-          Math.abs(timestamp - target) <= tolerance &&
-          this.isRainForecast(entry, config)
-      )
-      .sort((left, right) =>
-        Math.abs(left.timestamp - target) - Math.abs(right.timestamp - target)
-      )[0] || null;
+    return globalThis.MessageCenterAdapters?.get("weather")
+      ?.findRainForecast(hourlyArray, now, config) || null;
   },
 
   getWeatherTimestamp(value) {
-    if (Number.isFinite(value)) return value;
-    const parsed = new Date(value).getTime();
-    return Number.isNaN(parsed) ? null : parsed;
+    return globalThis.MessageCenterAdapters?.get("weather")?.timestamp(value) ?? null;
   },
 
   isRainForecast(entry, config) {
-    if (!entry || typeof entry !== "object") return false;
-    const number = (value) => {
-      const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-    const probability = number(entry.precipitationProbability);
-    const rain = number(entry.rain);
-    const snow = number(entry.snow);
-    const amount = number(entry.precipitationAmount);
-    const weatherType = String(entry.weatherType || "").toLowerCase();
-    const rainType = /(rain|shower|drizzle|thunderstorm)/.test(weatherType);
-    const snowOnly = /(snow|sleet|ice)/.test(weatherType) && !rainType;
-    const hasRainAmount =
-      (rain !== null && rain >= config.amountThreshold) ||
-      (!snowOnly &&
-        (snow === null || snow <= 0) &&
-        amount !== null &&
-        amount >= config.amountThreshold);
-    const likelyEnough = probability === null || probability >= config.probabilityThreshold;
-    return hasRainAmount || (rainType && likelyEnough);
+    return globalThis.MessageCenterAdapters?.get("weather")?.isRain(entry, config) || false;
   },
 
   handlePageAction(actions) {

@@ -54,3 +54,12 @@ Document the exact scope that was exercised in the pull request or release
 notes. Manual testing on a particular display or integration is valuable, but
 it should not be generalized beyond the versions and configurations actually
 tested.
+
+## Module integrations
+
+Read [the adapter guide](docs/ADAPTERS.md) before adding a module-specific
+notification path. Prefer automatic generic capture or the standard message
+API when those preserve the source event's meaning. A bundled adapter should
+exist only when MessageCenter can materially improve normalization, stable
+updates, resolution, urgency, retention, or presentation without making the
+source module a dependency.
