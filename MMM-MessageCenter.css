@@ -404,12 +404,10 @@
   display: block;
   grid-column: 1 / -1;
   margin: 0;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   font-size: 0.76rem;
   line-height: 1.2;
   opacity: 0.62;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .messages-line .message-meta {

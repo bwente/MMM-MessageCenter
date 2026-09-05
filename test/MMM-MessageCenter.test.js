@@ -577,6 +577,34 @@ test("explicit ephemeral messages toast without entering inbox history", () => {
   assert.deepEqual(module.notifications.map(({ name }) => name), ["SHOW_ALERT"]);
 });
 
+test("receives and clears PublicTransportHub service alerts", () => {
+  const module = instance({ showToasts: false });
+
+  module.notificationReceived("PTH_SERVICE_ALERT", {
+    id: "module_1:delay:trip-1",
+    active: true,
+    kind: "delay",
+    title: "S1 delayed",
+    body: "The departure is delayed.",
+    tripId: "trip-1",
+    timestamp: 100
+  });
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].source, "magicmirror.public-transport-hub");
+  assert.equal(module.messages[0].title, "S1 delayed");
+
+  module.notificationReceived("PTH_SERVICE_ALERT", {
+    id: "module_1:delay:trip-1",
+    active: false,
+    kind: "delay",
+    tripId: "trip-1",
+    timestamp: 200
+  });
+
+  assert.equal(module.messages.length, 0);
+});
+
 test("an ephemeral update removes matching retained attention cleanly", () => {
   const module = instance({ showToasts: false });
 

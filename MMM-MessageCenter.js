@@ -469,6 +469,25 @@ Module.register("MMM-MessageCenter", {
   },
 
   notificationReceived(notification, payload, sender) {
+    if (notification === "PTH_SERVICE_ALERT") {
+      if (!payload || typeof payload !== "object" || !payload.id) return;
+
+      const active = payload.active !== false;
+      this.receiveMessage({
+        id: payload.id,
+        source: "magicmirror.public-transport-hub",
+        type: `transit.${payload.kind || "service-alert"}`,
+        entityId: payload.tripId || payload.stationId || null,
+        title: active ? payload.title : "Transit alert resolved",
+        body: active ? payload.body : "",
+        urgency: active ? "attention" : "passive",
+        retention: active ? "untilViewed" : "ephemeral",
+        timestamp: payload.timestamp,
+        expires: payload.expires
+      }, { showToast: active });
+      return;
+    }
+
     if (notification === "MAX_PAGES_CHANGED") {
       if (Number.isInteger(payload) && payload >= 0) this.maxPages = payload;
       return;
