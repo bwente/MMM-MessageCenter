@@ -1,6 +1,6 @@
 {
   "name": "mmm-messagecenter",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Hardware-independent notification and attention hub for MagicMirror²",
   "private": true,
   "type": "commonjs",

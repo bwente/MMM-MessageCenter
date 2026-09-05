@@ -4,6 +4,26 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ## Unreleased
 
+## 0.5.0 - 2026-09-05
+
+### Added
+
+- Add an ordered adapter registry that keeps the standard MessageCenter API,
+  Remote Control, weather, PublicTransportHub, and generic module alert
+  ingestion independent and configurable.
+- Capture valid `SHOW_ALERT` and `SHOW_NOTIFICATION` broadcasts from ordinary
+  MagicMirror modules as passive history by default, with a conservative
+  allowlist and recursion prevention.
+- Accept `MESSAGE_CENTER_MESSAGE` from any ordinary MagicMirror module as the
+  preferred rich integration API while retaining `MC_MESSAGE` compatibility.
+- Add module integration documentation and an adapter-request issue template
+  so enhanced integrations can be proposed and maintained in MessageCenter.
+
+### Changed
+
+- Move bundled integration normalization out of the main module routing path.
+  Specific adapters take precedence over generic alert capture.
+
 ## 0.4.0 - 2026-09-05
 
 ### Added

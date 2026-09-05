@@ -1,0 +1,40 @@
+name: Module adapter request
+description: Request enhanced handling for another MagicMirror module
+title: "Adapter request: "
+labels:
+  - integration
+body:
+  - type: input
+    id: module
+    attributes:
+      label: Module and repository
+      placeholder: MMM-Example — https://github.com/example/MMM-Example
+    validations:
+      required: true
+  - type: input
+    id: notification
+    attributes:
+      label: Notification name
+      placeholder: EXAMPLE_ALERT
+    validations:
+      required: true
+  - type: textarea
+    id: payload
+    attributes:
+      label: Sanitized example payload
+      description: Remove credentials, private addresses, locations, names, and other personal data.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Desired behavior
+      description: Explain what should appear, what should be ignored, and whether events update or resolve.
+    validations:
+      required: true
+  - type: textarea
+    id: lifecycle
+    attributes:
+      label: Suggested urgency and lifecycle
+      description: Describe the expected urgency, retention, expiration, and stable ID behavior if known.
