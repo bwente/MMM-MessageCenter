@@ -70,6 +70,18 @@ npm ci --omit=dev
 
 ## Configuration
 
+### MMM-Config support
+
+MessageCenter includes a custom schema for
+[MMM-Config](https://github.com/sdetweil/MMM-Config). When both modules are
+installed, MMM-Config presents MessageCenter settings in friendly sections with
+validated choices, numeric limits, advanced options, and masked credential
+fields. No additional integration configuration is required.
+
+MMM-Config edits the normal MagicMirror `config.js`; it is optional and does
+not become a runtime dependency of MessageCenter. Review network-facing REST,
+MQTT, and image-host settings before saving them on a shared network.
+
 ### Standard MagicMirror region
 
 Line mode is the calmest fit for an ordinary MagicMirror region. It shows the
@@ -214,8 +226,10 @@ for its complete page layout syntax.
 | `transports.mqtt.enabled` | boolean | `false` | Subscribe to MQTT messages using the existing MessageCenter schema. |
 | `transports.mqtt.url` | string | `"mqtt://127.0.0.1:1883"` | MQTT broker URL. Keep credentials in the separate username and password settings. |
 | `transports.mqtt.topic` | string | `"messagecenter/messages"` | Exact MQTT topic to subscribe to. Use `topics` with an array for several exact topics. |
+| `transports.mqtt.topics` | string array | unset | Optional list of exact MQTT topics. When set, it replaces `topic`. |
 | `transports.mqtt.username` | string | `""` | Optional MQTT username stored only in private MagicMirror configuration. |
 | `transports.mqtt.password` | string | `""` | Optional MQTT password stored only in private MagicMirror configuration. |
+| `transports.mqtt.clientId` | string | `""` | Optional stable MQTT client identifier. |
 | `transports.unixSocket.enabled` | boolean | `false` | Accept newline-delimited JSON from local processes through a Unix-domain socket. |
 | `transports.unixSocket.path` | string | `"/tmp/mmm-messagecenter.sock"` | Absolute local socket path. |
 | `transports.unixSocket.mode` | integer | `0o600` | Filesystem permissions applied to the socket. |
