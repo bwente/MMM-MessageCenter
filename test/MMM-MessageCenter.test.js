@@ -577,34 +577,6 @@ test("explicit ephemeral messages toast without entering inbox history", () => {
   assert.deepEqual(module.notifications.map(({ name }) => name), ["SHOW_ALERT"]);
 });
 
-test("receives and clears PublicTransportHub service alerts", () => {
-  const module = instance({ showToasts: false });
-
-  module.notificationReceived("PTH_SERVICE_ALERT", {
-    id: "module_1:delay:trip-1",
-    active: true,
-    kind: "delay",
-    title: "S1 delayed",
-    body: "The departure is delayed.",
-    tripId: "trip-1",
-    timestamp: 100
-  });
-
-  assert.equal(module.messages.length, 1);
-  assert.equal(module.messages[0].source, "magicmirror.public-transport-hub");
-  assert.equal(module.messages[0].title, "S1 delayed");
-
-  module.notificationReceived("PTH_SERVICE_ALERT", {
-    id: "module_1:delay:trip-1",
-    active: false,
-    kind: "delay",
-    tripId: "trip-1",
-    timestamp: 200
-  });
-
-  assert.equal(module.messages.length, 0);
-});
-
 test("an ephemeral update removes matching retained attention cleanly", () => {
   const module = instance({ showToasts: false });
 
@@ -758,6 +730,10 @@ test("presents friendly labels for known internal sources", () => {
 
   assert.equal(module.getMessageSourceLabel("magicmirror.weather"), "Weather");
   assert.equal(module.getMessageSourceLabel("magicmirror.remote-control"), "Remote Control");
+  assert.equal(
+    module.getMessageSourceLabel("magicmirror.public-transport-hub"),
+    "Public Transport"
+  );
   assert.equal(module.getMessageSourceLabel("home-assistant"), "Home Assistant");
   assert.equal(
     module.getMessageSourceLabel("home-assistant.smartthings"),
@@ -772,6 +748,10 @@ test("translates known source labels but preserves unknown sender labels", () =>
 
   assert.equal(module.getMessageSourceLabel("magicmirror.weather"), "Wetter");
   assert.equal(module.getMessageSourceLabel("magicmirror.remote-control"), "Fernsteuerung");
+  assert.equal(
+    module.getMessageSourceLabel("magicmirror.public-transport-hub"),
+    "Öffentlicher Verkehr"
+  );
   assert.equal(module.getMessageSourceLabel("home-assistant.smartthings"), "SmartThings über Home Assistant");
   assert.equal(module.getMessageSourceLabel("kitchen-display"), "kitchen-display");
 });
@@ -1139,6 +1119,148 @@ test("can disable all internal MagicMirror notification providers", () => {
     false
   );
   assert.equal(module.messages.length, 0);
+});
+
+test("ingests an active PublicTransportHub service alert", () => {
+  const module = instance();
+  const expires = Date.now() + 30 * 60000;
+
+  module.notificationReceived(
+    "PTH_SERVICE_ALERT",
+    {
+      id: "module_2_MMM-PublicTransportHub:delay:trip-42",
+      active: true,
+      kind: "delay",
+      stationId: "station-1",
+      tripId: "trip-42",
+      title: "S1 to Central delayed 12 min",
+      body: "The 8:15 AM departure is delayed.",
+      timestamp: Date.now(),
+      expires
+    },
+    { name: "MMM-PublicTransportHub" }
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.deepEqual(
+    {
+      id: module.messages[0].id,
+      type: module.messages[0].type,
+      source: module.messages[0].source,
+      entityId: module.messages[0].entityId,
+      title: module.messages[0].title,
+      body: module.messages[0].body,
+      urgency: module.messages[0].urgency,
+      retention: module.messages[0].retention,
+      expires: module.messages[0].expires
+    },
+    {
+      id: "module_2_MMM-PublicTransportHub:delay:trip-42",
+      type: "transit.delay",
+      source: "magicmirror.public-transport-hub",
+      entityId: "trip-42",
+      title: "S1 to Central delayed 12 min",
+      body: "The 8:15 AM departure is delayed.",
+      urgency: "attention",
+      retention: "untilViewed",
+      expires
+    }
+  );
+  assert.equal(module.notifications.filter(({ name }) => name === "SHOW_ALERT").length, 1);
+});
+
+test("updates an existing transit alert silently while preserving read state", () => {
+  const module = instance();
+  const sender = { data: { module: "MMM-PublicTransportHub" } };
+  const original = {
+    id: "pth:delay:trip-42",
+    active: true,
+    kind: "delay",
+    title: "S1 delayed 10 min",
+    body: "Initial delay",
+    timestamp: Date.now(),
+    expires: Date.now() + 30 * 60000
+  };
+
+  module.notificationReceived("PTH_SERVICE_ALERT", original, sender);
+  assert.equal(module.acknowledgeMessage("magicmirror.public-transport-hub", original.id), true);
+  module.notifications.length = 0;
+
+  module.notificationReceived(
+    "PTH_SERVICE_ALERT",
+    {
+      ...original,
+      title: "S1 delayed 20 min",
+      body: "Updated delay",
+      timestamp: original.timestamp + 1000
+    },
+    sender
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].title, "S1 delayed 20 min");
+  assert.equal(module.messages[0].body, "Updated delay");
+  assert.equal(module.messages[0].unread, false);
+  assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+  assert.equal(module.notifications.some(({ name }) => name === "ATTENTION_ON"), false);
+});
+
+test("removes a resolved transit alert and clears attention", () => {
+  const module = instance({ showToasts: false });
+  const sender = { name: "MMM-PublicTransportHub" };
+
+  module.notificationReceived(
+    "PTH_SERVICE_ALERT",
+    {
+      id: "pth:cancellation:trip-7",
+      active: true,
+      kind: "cancellation",
+      title: "4:30 PM departure cancelled"
+    },
+    sender
+  );
+  module.notificationReceived(
+    "PTH_SERVICE_ALERT",
+    { id: "pth:cancellation:trip-7", active: false },
+    sender
+  );
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.unreadAttentionCount, 0);
+  assert.equal(module.notifications.at(-1).name, "ATTENTION_OFF");
+});
+
+test("honors PublicTransportHub provider and master ingestion settings", () => {
+  const payload = { id: "pth:delay:1", title: "Delayed", active: true };
+  const sender = { name: "MMM-PublicTransportHub" };
+  const providerDisabled = instance({
+    internalNotifications: { publicTransportHub: { enabled: false } }
+  });
+  const allDisabled = instance({ internalNotifications: { enabled: false } });
+
+  providerDisabled.notificationReceived("PTH_SERVICE_ALERT", payload, sender);
+  allDisabled.notificationReceived("PTH_SERVICE_ALERT", payload, sender);
+
+  assert.equal(providerDisabled.messages.length, 0);
+  assert.equal(allDisabled.messages.length, 0);
+});
+
+test("ignores malformed, unrelated, and recursively emitted transit alerts", () => {
+  const module = instance();
+  const sender = { name: "MMM-PublicTransportHub" };
+
+  for (const payload of [null, [], {}, { id: "missing-title" }]) {
+    module.notificationReceived("PTH_SERVICE_ALERT", payload, sender);
+  }
+  module.notificationReceived(
+    "PTH_SERVICE_ALERT",
+    { id: "wrong-sender", title: "Ignore this" },
+    { name: "MMM-MessageCenter" }
+  );
+  module.notificationReceived("PTH_DEPARTURES", { id: "operational" }, sender);
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.notifications.length, 0);
 });
 
 test("captures a Remote Control alert without repeating its toast", () => {

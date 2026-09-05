@@ -58,6 +58,9 @@ Module.register("MMM-MessageCenter", {
           timeout: 10000,
           expiresAfterMinutes: 90
         }
+      },
+      publicTransportHub: {
+        enabled: true
       }
     },
     webhook: {
@@ -388,6 +391,7 @@ Module.register("MMM-MessageCenter", {
     const labels = {
       "magicmirror.weather": "SOURCE_WEATHER",
       "magicmirror.remote-control": "SOURCE_REMOTE_CONTROL",
+      "magicmirror.public-transport-hub": "SOURCE_PUBLIC_TRANSPORT_HUB",
       "home-assistant": "SOURCE_HOME_ASSISTANT",
       "home-assistant.smartthings": "SOURCE_SMARTTHINGS_HOME_ASSISTANT",
       smartthings: "SOURCE_SMARTTHINGS"
@@ -469,25 +473,6 @@ Module.register("MMM-MessageCenter", {
   },
 
   notificationReceived(notification, payload, sender) {
-    if (notification === "PTH_SERVICE_ALERT") {
-      if (!payload || typeof payload !== "object" || !payload.id) return;
-
-      const active = payload.active !== false;
-      this.receiveMessage({
-        id: payload.id,
-        source: "magicmirror.public-transport-hub",
-        type: `transit.${payload.kind || "service-alert"}`,
-        entityId: payload.tripId || payload.stationId || null,
-        title: active ? payload.title : "Transit alert resolved",
-        body: active ? payload.body : "",
-        urgency: active ? "attention" : "passive",
-        retention: active ? "untilViewed" : "ephemeral",
-        timestamp: payload.timestamp,
-        expires: payload.expires
-      }, { showToast: active });
-      return;
-    }
-
     if (notification === "MAX_PAGES_CHANGED") {
       if (Number.isInteger(payload) && payload >= 0) this.maxPages = payload;
       return;
@@ -603,10 +588,78 @@ Module.register("MMM-MessageCenter", {
       return this.handleRemoteControlNotification(notification, payload);
     }
 
+    if (
+      notification === "PTH_SERVICE_ALERT" &&
+      this.isPublicTransportHubSender(sender)
+    ) {
+      return this.handlePublicTransportHubAlert(payload);
+    }
+
     if (notification === "WEATHER_UPDATED") {
       return this.handleWeatherUpdated(payload);
     }
     return false;
+  },
+
+  isPublicTransportHubSender(sender) {
+    if (!sender || typeof sender !== "object") return false;
+    return (
+      sender.name === "MMM-PublicTransportHub" ||
+      sender.data?.module === "MMM-PublicTransportHub"
+    );
+  },
+
+  getPublicTransportHubNotificationConfig() {
+    const defaults = this.defaults.internalNotifications.publicTransportHub;
+    const configured = this.config.internalNotifications?.publicTransportHub || {};
+    return {
+      ...defaults,
+      ...configured
+    };
+  },
+
+  handlePublicTransportHubAlert(payload) {
+    const providerConfig = this.getPublicTransportHubNotificationConfig();
+    if (!providerConfig.enabled) return false;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    if (payload.id === undefined || payload.id === null || String(payload.id).trim() === "") {
+      return false;
+    }
+
+    const source = "magicmirror.public-transport-hub";
+    const id = String(payload.id);
+    if (payload.active === false) return this.resolveMessage(source, id);
+
+    if (typeof payload.title !== "string" || !payload.title.trim()) return false;
+    const existing = this.messages.find(
+      (message) => message.source === source && message.id === id
+    );
+    const types = {
+      cancellation: "transit.cancellation",
+      delay: "transit.delay",
+      remark: "transit.remark",
+      no_departures: "transit.no-departures"
+    };
+
+    return this.receiveMessage(
+      {
+        id,
+        type: types[payload.kind] || "transit.service-alert",
+        source,
+        entityId: payload.tripId || payload.stationId,
+        title: payload.title,
+        body: typeof payload.body === "string" ? payload.body : "",
+        urgency: "attention",
+        retention: "untilViewed",
+        timestamp: payload.timestamp,
+        unread: existing ? existing.unread : true,
+        expires: payload.expires
+      },
+      {
+        honorState: Boolean(existing),
+        showToast: !existing
+      }
+    );
   },
 
   isRemoteControlSender(sender) {
