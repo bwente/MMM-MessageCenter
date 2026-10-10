@@ -116,7 +116,7 @@ Module.register("MMM-MessageCenter", {
       "integrations/my-scoreboard.js",
       "integrations/weather.js",
       "integrations/generic-alert.js"
-    ];
+    ].map((script) => this.file(script));
   },
 
   getTranslations() {

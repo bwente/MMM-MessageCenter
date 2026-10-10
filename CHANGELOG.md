@@ -2,6 +2,14 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
+## 0.7.2 - 2026-10-10
+
+### Fixed
+
+- Load internal notification adapters from the module directory so weather,
+  Remote Control, PublicTransportHub, MyScoreboard, and standard MagicMirror
+  notification ingestion work in real MagicMirror installations.
+
 ## 0.7.1 - 2026-10-10
 
 ### Added
