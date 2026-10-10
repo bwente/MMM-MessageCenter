@@ -61,7 +61,8 @@ module.exports = NodeHelper.create({
 
     const host = typeof rawConfig.host === "string" ? rawConfig.host : "127.0.0.1";
     const port = Number.isInteger(rawConfig.port) ? rawConfig.port : 8787;
-    const token = typeof rawConfig.token === "string" ? rawConfig.token : "";
+    const token = this.resolveWebhookToken(rawConfig);
+    if (token === null) return;
 
     if (port < 1 || port > 65535) {
       this.sendSocketNotification("MC_ERROR", `Invalid webhook port: ${port}`);
@@ -105,6 +106,21 @@ module.exports = NodeHelper.create({
       this.sendSocketNotification("MC_ERROR", `Webhook server failed: ${error.message}`);
       this.server = null;
     });
+  },
+
+  resolveWebhookToken(rawConfig = {}) {
+    const inlineToken = typeof rawConfig.token === "string" ? rawConfig.token : "";
+    if (inlineToken) return inlineToken;
+
+    const tokenFile = typeof rawConfig.tokenFile === "string" ? rawConfig.tokenFile.trim() : "";
+    if (!tokenFile) return "";
+
+    try {
+      return fs.readFileSync(tokenFile, "utf8").trim();
+    } catch {
+      this.sendSocketNotification("MC_ERROR", "Webhook token file could not be read");
+      return null;
+    }
   },
 
   isAuthorized(request, token) {

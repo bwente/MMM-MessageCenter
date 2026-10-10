@@ -53,6 +53,42 @@ test("accepts the configured bearer token", () => {
   assert.equal(module.isAuthorized(request, "different"), false);
 });
 
+test("loads a bearer token from a file when no inline token is configured", () => {
+  const module = helper();
+  const fs = require("node:fs");
+  const originalReadFileSync = fs.readFileSync;
+  let requested;
+  fs.readFileSync = (path, encoding) => {
+    requested = { path, encoding };
+    return " file-secret\n";
+  };
+
+  try {
+    assert.equal(module.resolveWebhookToken({ tokenFile: "/run/secrets/messagecenter" }), "file-secret");
+  } finally {
+    fs.readFileSync = originalReadFileSync;
+  }
+
+  assert.deepEqual(requested, { path: "/run/secrets/messagecenter", encoding: "utf8" });
+});
+
+test("prefers an inline bearer token over a token file", () => {
+  const module = helper();
+  assert.equal(
+    module.resolveWebhookToken({ token: "inline-secret", tokenFile: "/missing" }),
+    "inline-secret"
+  );
+});
+
+test("does not start the webhook when its token file cannot be read", () => {
+  const module = helper();
+  const token = module.resolveWebhookToken({ tokenFile: "/missing" });
+
+  assert.equal(token, null);
+  assert.match(module.socketNotifications[0].payload, /token file could not be read/);
+  assert.doesNotMatch(module.socketNotifications[0].payload, /\/missing/);
+});
+
 test("rejects invalid webhook ports", () => {
   const module = helper();
 

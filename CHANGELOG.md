@@ -2,7 +2,17 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
-## Unreleased
+## 0.7.1 - 2026-10-10
+
+### Added
+
+- Add optional webhook bearer-token file support for installations that keep
+  credentials outside `config.js`.
+
+### Security
+
+- Refuse to start the webhook when its configured token file cannot be read,
+  without exposing the private file path in browser-visible error messages.
 
 ## 0.7.0 - 2026-10-10
 

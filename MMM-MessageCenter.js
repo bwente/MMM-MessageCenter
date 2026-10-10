@@ -75,7 +75,8 @@ Module.register("MMM-MessageCenter", {
     webhook: {
       host: "127.0.0.1",
       port: 8787,
-      token: ""
+      token: "",
+      tokenFile: ""
     },
     transports: {
       mqtt: {
