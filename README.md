@@ -430,6 +430,40 @@ The adapter consumes only normalized events and does not interpret provider
 responses, delays, routes, or service remarks itself. Both modules continue to
 operate independently when the other is absent.
 
+### MMM-MyScoreboard
+
+[MMM-MyScoreboard](https://github.com/dathbe/MMM-MyScoreboard) can broadcast
+followed-team game milestones through `MYSCOREBOARD_GAME_EVENT`. Enable those
+events in its configuration:
+
+```js
+gameEventNotifications: {
+  enabled: true,
+  events: ["game.started", "game.halftime", "game.final"]
+}
+```
+
+MessageCenter's adapter is enabled by default and can be disabled independently:
+
+```js
+internalNotifications: {
+  myScoreboard: {
+    enabled: true
+  }
+}
+```
+
+Starts are retained as passive history. Halftime and final events create
+attention messages. Duplicate updates replace the same milestone silently and
+preserve its read state. Each milestone expires automatically so an old game
+does not remain indefinitely. `game.score` is intentionally ignored: it is too
+noisy for an ambient inbox in high-scoring sports.
+
+The source module remains responsible for selecting teams, retrieving scores,
+and deciding when a game reaches each milestone. MessageCenter only validates,
+normalizes, and presents the event. Either module continues to operate normally
+when the other is absent.
+
 ### Rain approaching
 
 The first internal provider listens for `WEATHER_UPDATED` from MagicMirror's

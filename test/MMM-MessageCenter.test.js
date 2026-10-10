@@ -25,6 +25,7 @@ require("../integrations/adapter-registry.js");
 require("../integrations/standard-message.js");
 require("../integrations/remote-control.js");
 require("../integrations/public-transport-hub.js");
+require("../integrations/my-scoreboard.js");
 require("../integrations/weather.js");
 require("../integrations/generic-alert.js");
 require("../MMM-MessageCenter.js");
@@ -147,6 +148,7 @@ test("loads the ordered internal notification adapter registry", () => {
     "integrations/standard-message.js",
     "integrations/remote-control.js",
     "integrations/public-transport-hub.js",
+    "integrations/my-scoreboard.js",
     "integrations/weather.js",
     "integrations/generic-alert.js"
   ]);
@@ -751,6 +753,7 @@ test("presents friendly labels for known internal sources", () => {
     module.getMessageSourceLabel("magicmirror.public-transport-hub"),
     "Public Transport"
   );
+  assert.equal(module.getMessageSourceLabel("magicmirror.my-scoreboard"), "Sports");
   assert.equal(module.getMessageSourceLabel("home-assistant"), "Home Assistant");
   assert.equal(
     module.getMessageSourceLabel("home-assistant.smartthings"),
@@ -769,6 +772,7 @@ test("translates known source labels but preserves unknown sender labels", () =>
     module.getMessageSourceLabel("magicmirror.public-transport-hub"),
     "Öffentlicher Verkehr"
   );
+  assert.equal(module.getMessageSourceLabel("magicmirror.my-scoreboard"), "Sport");
   assert.equal(module.getMessageSourceLabel("home-assistant.smartthings"), "SmartThings über Home Assistant");
   assert.equal(module.getMessageSourceLabel("kitchen-display"), "kitchen-display");
 });
@@ -1275,6 +1279,133 @@ test("ignores malformed, unrelated, and recursively emitted transit alerts", () 
     { name: "MMM-MessageCenter" }
   );
   module.notificationReceived("PTH_DEPARTURES", { id: "operational" }, sender);
+
+  assert.equal(module.messages.length, 0);
+  assert.equal(module.notifications.length, 0);
+});
+
+test("normalizes MyScoreboard start, halftime, and final milestones", () => {
+  const module = instance();
+  const sender = { name: "MMM-MyScoreboard" };
+  const base = {
+    league: "NBA",
+    label: "Basketball",
+    gameId: "NBA:MIA@ORL",
+    timestamp: Date.now(),
+    home: { name: "Orlando Magic", abbreviation: "ORL", score: 55 },
+    away: { name: "Miami Heat", abbreviation: "MIA", score: 49 },
+    followedTeams: ["ORL"]
+  };
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", { ...base, event: "game.started" }, sender);
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", { ...base, event: "game.halftime" }, sender);
+  module.notificationReceived(
+    "MYSCOREBOARD_GAME_EVENT",
+    {
+      ...base,
+      event: "game.final",
+      home: { ...base.home, score: 108 },
+      away: { ...base.away, score: 101 }
+    },
+    sender
+  );
+
+  assert.deepEqual(
+    module.messages.map(({ id, type, title, body, urgency }) => ({ id, type, title, body, urgency })),
+    [
+      {
+        id: "NBA:MIA@ORL:game.final",
+        type: "sports.game.final",
+        title: "Miami Heat at Orlando Magic",
+        body: "Final. Miami Heat 101, Orlando Magic 108.",
+        urgency: "attention"
+      },
+      {
+        id: "NBA:MIA@ORL:game.halftime",
+        type: "sports.game.halftime",
+        title: "Miami Heat at Orlando Magic",
+        body: "Halftime. Miami Heat 49, Orlando Magic 55.",
+        urgency: "attention"
+      },
+      {
+        id: "NBA:MIA@ORL:game.started",
+        type: "sports.game.started",
+        title: "Miami Heat at Orlando Magic",
+        body: "Game started. Miami Heat 49, Orlando Magic 55.",
+        urgency: "passive"
+      }
+    ]
+  );
+  assert.equal(module.messages[0].source, "magicmirror.my-scoreboard");
+  assert.equal(module.messages[0].entityId, "NBA:MIA@ORL");
+  assert.equal(module.messages[0].expires, base.timestamp + 12 * 60 * 60000);
+});
+
+test("updates a duplicate MyScoreboard milestone silently and preserves read state", () => {
+  const module = instance();
+  const sender = { name: "MMM-MyScoreboard" };
+  const payload = {
+    event: "game.halftime",
+    gameId: "NBA:MIA@ORL",
+    timestamp: Date.now(),
+    home: { name: "Orlando Magic", score: 55 },
+    away: { name: "Miami Heat", score: 49 }
+  };
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", payload, sender);
+  module.acknowledgeMessage("magicmirror.my-scoreboard", "NBA:MIA@ORL:game.halftime");
+  module.notifications.length = 0;
+  module.notificationReceived(
+    "MYSCOREBOARD_GAME_EVENT",
+    { ...payload, timestamp: payload.timestamp + 1000, home: { name: "Orlando Magic", score: 56 } },
+    sender
+  );
+
+  assert.equal(module.messages.length, 1);
+  assert.equal(module.messages[0].body, "Halftime. Miami Heat 49, Orlando Magic 56.");
+  assert.equal(module.messages[0].unread, false);
+  assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
+});
+
+test("can disable the MyScoreboard adapter independently", () => {
+  const module = instance({ internalNotifications: { myScoreboard: { enabled: false } } });
+
+  module.notificationReceived(
+    "MYSCOREBOARD_GAME_EVENT",
+    {
+      event: "game.final",
+      gameId: "NHL:TBL@FLA",
+      home: { name: "Florida Panthers", score: 4 },
+      away: { name: "Tampa Bay Lightning", score: 2 }
+    },
+    { name: "MMM-MyScoreboard" }
+  );
+
+  assert.equal(module.messages.length, 0);
+});
+
+test("ignores noisy, malformed, unrelated, and recursive MyScoreboard events", () => {
+  const module = instance();
+  const sender = { name: "MMM-MyScoreboard" };
+  const validTeams = {
+    gameId: "NBA:MIA@ORL",
+    home: { name: "Orlando Magic", score: 55 },
+    away: { name: "Miami Heat", score: 49 }
+  };
+
+  for (const payload of [
+    null,
+    [],
+    {},
+    { ...validTeams, event: "game.score" },
+    { ...validTeams, event: "game.final", home: {} }
+  ]) module.notificationReceived("MYSCOREBOARD_GAME_EVENT", payload, sender);
+  module.notificationReceived(
+    "MYSCOREBOARD_GAME_EVENT",
+    { ...validTeams, event: "game.final" },
+    { name: "MMM-MessageCenter" }
+  );
+  module.notificationReceived("MYSCOREBOARD_SCORE_UPDATE", validTeams, sender);
 
   assert.equal(module.messages.length, 0);
   assert.equal(module.notifications.length, 0);

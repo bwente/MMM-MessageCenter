@@ -104,7 +104,8 @@
                     }
                   }
                 },
-                "publicTransportHub": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } }
+                "publicTransportHub": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } },
+                "myScoreboard": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } }
               }
             },
             "webhook": {
@@ -204,7 +205,8 @@
             { "key": "MMM-MessageCenter.config.internalNotifications.standard.enabled", "title": "Standard MessageCenter API" },
             { "key": "MMM-MessageCenter.config.internalNotifications.generic.enabled", "title": "Automatic common alert capture" },
             { "key": "MMM-MessageCenter.config.internalNotifications.remoteControl.enabled", "title": "MMM-Remote-Control adapter" },
-            { "key": "MMM-MessageCenter.config.internalNotifications.publicTransportHub.enabled", "title": "MMM-PublicTransportHub adapter" }
+            { "key": "MMM-MessageCenter.config.internalNotifications.publicTransportHub.enabled", "title": "MMM-PublicTransportHub adapter" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.enabled", "title": "MMM-MyScoreboard adapter" }
           ]
         },
         {

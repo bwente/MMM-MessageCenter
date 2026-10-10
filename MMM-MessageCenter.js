@@ -67,6 +67,9 @@ Module.register("MMM-MessageCenter", {
       },
       publicTransportHub: {
         enabled: true
+      },
+      myScoreboard: {
+        enabled: true
       }
     },
     webhook: {
@@ -109,6 +112,7 @@ Module.register("MMM-MessageCenter", {
       "integrations/standard-message.js",
       "integrations/remote-control.js",
       "integrations/public-transport-hub.js",
+      "integrations/my-scoreboard.js",
       "integrations/weather.js",
       "integrations/generic-alert.js"
     ];
@@ -409,6 +413,7 @@ Module.register("MMM-MessageCenter", {
       "magicmirror.weather": "SOURCE_WEATHER",
       "magicmirror.remote-control": "SOURCE_REMOTE_CONTROL",
       "magicmirror.public-transport-hub": "SOURCE_PUBLIC_TRANSPORT_HUB",
+      "magicmirror.my-scoreboard": "SOURCE_MY_SCOREBOARD",
       "home-assistant": "SOURCE_HOME_ASSISTANT",
       "home-assistant.smartthings": "SOURCE_SMARTTHINGS_HOME_ASSISTANT",
       smartthings: "SOURCE_SMARTTHINGS"
