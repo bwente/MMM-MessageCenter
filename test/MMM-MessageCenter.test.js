@@ -143,7 +143,15 @@ test("provides the complete English translation entry point", () => {
 });
 
 test("loads the ordered internal notification adapter registry", () => {
-  assert.deepEqual(definition.getScripts(), [
+  const requested = [];
+  const scripts = definition.getScripts.call({
+    file(script) {
+      requested.push(script);
+      return `/modules/MMM-MessageCenter/${script}`;
+    }
+  });
+
+  assert.deepEqual(requested, [
     "integrations/adapter-registry.js",
     "integrations/standard-message.js",
     "integrations/remote-control.js",
@@ -151,6 +159,15 @@ test("loads the ordered internal notification adapter registry", () => {
     "integrations/my-scoreboard.js",
     "integrations/weather.js",
     "integrations/generic-alert.js"
+  ]);
+  assert.deepEqual(scripts, [
+    "/modules/MMM-MessageCenter/integrations/adapter-registry.js",
+    "/modules/MMM-MessageCenter/integrations/standard-message.js",
+    "/modules/MMM-MessageCenter/integrations/remote-control.js",
+    "/modules/MMM-MessageCenter/integrations/public-transport-hub.js",
+    "/modules/MMM-MessageCenter/integrations/my-scoreboard.js",
+    "/modules/MMM-MessageCenter/integrations/weather.js",
+    "/modules/MMM-MessageCenter/integrations/generic-alert.js"
   ]);
 });
 
