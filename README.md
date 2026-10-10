@@ -223,6 +223,7 @@ for its complete page layout syntax.
 | `webhook.host` | string | `"127.0.0.1"` | Address on which the webhook listens. The secure default accepts only software running on the mirror. |
 | `webhook.port` | integer | `8787` | Webhook TCP port. |
 | `webhook.token` | string | `""` | Optional bearer token. When configured, every webhook request must provide it. |
+| `webhook.tokenFile` | string | `""` | Optional absolute path to a file containing the bearer token. Used only when `webhook.token` is empty. |
 | `transports.mqtt.enabled` | boolean | `false` | Subscribe to MQTT messages using the existing MessageCenter schema. |
 | `transports.mqtt.url` | string | `"mqtt://127.0.0.1:1883"` | MQTT broker URL. Keep credentials in the separate username and password settings. |
 | `transports.mqtt.topic` | string | `"messagecenter/messages"` | Exact MQTT topic to subscribe to. Use `topics` with an array for several exact topics. |
@@ -562,6 +563,20 @@ curl http://MIRROR_IP:8787/message \
   -H "Content-Type: application/json" \
   -d '{"title":"Test message"}'
 ```
+
+To keep the token out of `config.js`, store it in a file readable by the
+MagicMirror process and configure its absolute path instead:
+
+```js
+webhook: {
+  host: "0.0.0.0",
+  port: 8787,
+  tokenFile: "/absolute/path/to/messagecenter-token"
+}
+```
+
+An inline `token` takes precedence when both settings are present. MessageCenter
+does not start the webhook if a configured token file cannot be read.
 
 When a non-localhost webhook has no token, MessageCenter logs a startup warning.
 Existing installations that intentionally accept LAN requests should keep an
