@@ -100,6 +100,12 @@ Add the file to `getScripts()`, add an independent configuration switch, and
 test accepted, updated, resolved, malformed, operational, and recursive cases
 as applicable. Sender-authored titles and bodies must remain untranslated.
 
+The bundled `my-scoreboard` adapter is an example of milestone normalization.
+MMM-MyScoreboard remains responsible for followed teams and game-state
+detection; its `MYSCOREBOARD_GAME_EVENT` broadcast contains neutral game data.
+MessageCenter turns start, halftime, and final milestones into short-lived
+ambient messages while deliberately ignoring per-score events.
+
 ## Requesting an adapter
 
 If a module is not captured automatically, or its existing events could produce

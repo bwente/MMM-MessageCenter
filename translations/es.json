@@ -23,6 +23,11 @@
   "SOURCE_WEATHER": "Tiempo",
   "SOURCE_REMOTE_CONTROL": "Control remoto",
   "SOURCE_PUBLIC_TRANSPORT_HUB": "Transporte público",
+  "SOURCE_MY_SCOREBOARD": "Deportes",
+  "SPORTS_MATCHUP": "{away} en {home}",
+  "SPORTS_GAME_STARTED": "El partido ha comenzado. {away} {awayScore}, {home} {homeScore}.",
+  "SPORTS_GAME_HALFTIME": "Descanso. {away} {awayScore}, {home} {homeScore}.",
+  "SPORTS_GAME_FINAL": "Final. {away} {awayScore}, {home} {homeScore}.",
   "SOURCE_HOME_ASSISTANT": "Home Assistant",
   "SOURCE_SMARTTHINGS_HOME_ASSISTANT": "SmartThings mediante Home Assistant",
   "SOURCE_SMARTTHINGS": "SmartThings"

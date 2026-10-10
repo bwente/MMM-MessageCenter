@@ -4,6 +4,22 @@ All notable changes to MMM-MessageCenter are documented in this file.
 
 ## Unreleased
 
+## 0.7.0 - 2026-10-10
+
+### Added
+
+- Add an optional MMM-MyScoreboard adapter for followed-team game start,
+  halftime, and final milestones.
+- Add translated sports source labels and generated milestone text in English,
+  German, Spanish, and French.
+- Add MMM-Config coverage and documentation for enabling or disabling the
+  adapter independently.
+
+### Changed
+
+- Keep score-by-score sports events out of the ambient inbox while retaining
+  stable, expiring milestone messages with silent duplicate updates.
+
 ## 0.6.0 - 2026-09-05
 
 ### Added
