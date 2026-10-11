@@ -471,6 +471,12 @@ Use MyScoreboard's `leagueEvents` overrides to opt low-scoring leagues into
 MLS goals are included while NBA games continue to use the quieter global
 start, halftime, and final list.
 
+For numeric head-to-head scores, MessageCenter puts the leading team and higher
+score first with a visible lead, tie, or final marker. Non-numeric scores and
+ranked events retain the provider's original order rather than applying
+head-to-head assumptions; the source module remains responsible for standings,
+golf, racing, and similar sport-specific meaning.
+
 The source module remains responsible for selecting teams, retrieving scores,
 and deciding when a game reaches each milestone. MessageCenter only validates,
 normalizes, and presents the event. Either module continues to operate normally

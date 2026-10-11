@@ -2,6 +2,15 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
+## 0.8.1 - 2026-10-11
+
+### Changed
+
+- Put the leading team and higher score first in numeric head-to-head halftime,
+  score, and final messages, with visible lead, tie, and final indicators.
+- Preserve provider ordering for non-numeric and ranked results instead of
+  guessing at sport-specific standings.
+
 ## 0.8.0 - 2026-10-10
 
 ### Added

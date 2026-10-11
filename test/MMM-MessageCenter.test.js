@@ -1334,14 +1334,14 @@ test("normalizes MyScoreboard start, halftime, and final milestones with calm li
         id: "NBA:MIA@ORL:game.final",
         type: "sports.game.final",
         title: "Miami Heat at Orlando Magic",
-        body: "Final. Miami Heat 101, Orlando Magic 108.",
+        body: "✓ Orlando Magic 108 · Miami Heat 101 — Final",
         urgency: "attention"
       },
       {
         id: "NBA:MIA@ORL:game.halftime",
         type: "sports.game.halftime",
         title: "Miami Heat at Orlando Magic",
-        body: "Halftime. Miami Heat 49, Orlando Magic 55.",
+        body: "▲ Orlando Magic 55 · Miami Heat 49 — Leads at halftime",
         urgency: "attention"
       },
       {
@@ -1382,14 +1382,40 @@ test("normalizes distinct opt-in MyScoreboard score events", () => {
   assert.deepEqual(module.messages.map(({ id, body }) => ({ id, body })), [
     {
       id: "USA_MLS:CLB@ORL:game.score:0-2",
-      body: "Score update. Columbus Crew 0, Orlando City SC 2."
+      body: "▲ Orlando City SC 2 · Columbus Crew 0 — Leads"
     },
     {
       id: "USA_MLS:CLB@ORL:game.score:0-1",
-      body: "Score update. Columbus Crew 0, Orlando City SC 1."
+      body: "▲ Orlando City SC 1 · Columbus Crew 0 — Leads"
     }
   ]);
   assert.equal(module.messages[0].expires, base.timestamp + 60000 + 2 * 60 * 60000);
+});
+
+test("makes tied head-to-head scores clear at a glance", () => {
+  const module = instance();
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", {
+    event: "game.score",
+    gameId: "USA_MLS:CLB@ORL",
+    away: { name: "Columbus Crew", score: "1" },
+    home: { name: "Orlando City SC", score: "1" }
+  }, { name: "MMM-MyScoreboard" });
+
+  assert.equal(module.messages[0].body, "= Columbus Crew 1 · Orlando City SC 1 — Tied");
+});
+
+test("preserves the provider order when scores are not directly comparable", () => {
+  const module = instance();
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", {
+    event: "game.final",
+    gameId: "ranked:event",
+    away: { name: "Driver One", score: "P1" },
+    home: { name: "Driver Two", score: "P2" }
+  }, { name: "MMM-MyScoreboard" });
+
+  assert.equal(module.messages[0].body, "Final. Driver One P1, Driver Two P2.");
 });
 
 test("allows MyScoreboard event lifetimes to be configured", () => {
@@ -1432,7 +1458,7 @@ test("updates a duplicate MyScoreboard milestone silently and preserves read sta
   );
 
   assert.equal(module.messages.length, 1);
-  assert.equal(module.messages[0].body, "Halftime. Miami Heat 49, Orlando Magic 56.");
+  assert.equal(module.messages[0].body, "▲ Orlando Magic 56 · Miami Heat 49 — Leads at halftime");
   assert.equal(module.messages[0].unread, false);
   assert.equal(module.notifications.some(({ name }) => name === "SHOW_ALERT"), false);
 });

@@ -43,6 +43,44 @@
     return null;
   }
 
+  function numericScore(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string" || !/^-?\d+(?:\.\d+)?$/.test(value.trim())) return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function scoreBody(module, event, away, awayScore, home, homeScore, fallbackKey) {
+    if (!["game.halftime", "game.score", "game.final"].includes(event)) {
+      return module.translate(fallbackKey, { away, awayScore, home, homeScore });
+    }
+
+    const awayNumber = numericScore(awayScore);
+    const homeNumber = numericScore(homeScore);
+    if (awayNumber === null || homeNumber === null) {
+      return module.translate(fallbackKey, { away, awayScore, home, homeScore });
+    }
+
+    if (awayNumber === homeNumber) {
+      const key = event === "game.final" ? "SPORTS_FINAL_TIED" : event === "game.halftime"
+        ? "SPORTS_HALFTIME_TIED"
+        : "SPORTS_SCORE_TIED";
+      return module.translate(key, { away, awayScore, home, homeScore });
+    }
+
+    const awayLeads = awayNumber > homeNumber;
+    const values = {
+      leader: awayLeads ? away : home,
+      leaderScore: awayLeads ? awayScore : homeScore,
+      trailer: awayLeads ? home : away,
+      trailerScore: awayLeads ? homeScore : awayScore
+    };
+    const key = event === "game.final" ? "SPORTS_FINAL_WINNER" : event === "game.halftime"
+      ? "SPORTS_HALFTIME_LEADER"
+      : "SPORTS_SCORE_LEADER";
+    return module.translate(key, values);
+  }
+
   root.MessageCenterAdapters.register({
     id: "my-scoreboard",
     priority: 800,
@@ -76,7 +114,7 @@
         source,
         entityId: payload.gameId.trim(),
         title: module.translate("SPORTS_MATCHUP", { away, home }),
-        body: module.translate(eventConfig.bodyKey, { away, awayScore, home, homeScore }),
+        body: scoreBody(module, payload.event, away, awayScore, home, homeScore, eventConfig.bodyKey),
         urgency: eventConfig.urgency,
         retention: eventConfig.retention,
         timestamp,

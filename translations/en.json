@@ -29,6 +29,12 @@
   "SPORTS_GAME_HALFTIME": "Halftime. {away} {awayScore}, {home} {homeScore}.",
   "SPORTS_GAME_SCORE": "Score update. {away} {awayScore}, {home} {homeScore}.",
   "SPORTS_GAME_FINAL": "Final. {away} {awayScore}, {home} {homeScore}.",
+  "SPORTS_HALFTIME_LEADER": "▲ {leader} {leaderScore} · {trailer} {trailerScore} — Leads at halftime",
+  "SPORTS_HALFTIME_TIED": "= {away} {awayScore} · {home} {homeScore} — Tied at halftime",
+  "SPORTS_SCORE_LEADER": "▲ {leader} {leaderScore} · {trailer} {trailerScore} — Leads",
+  "SPORTS_SCORE_TIED": "= {away} {awayScore} · {home} {homeScore} — Tied",
+  "SPORTS_FINAL_WINNER": "✓ {leader} {leaderScore} · {trailer} {trailerScore} — Final",
+  "SPORTS_FINAL_TIED": "= {away} {awayScore} · {home} {homeScore} — Final",
   "SOURCE_HOME_ASSISTANT": "Home Assistant",
   "SOURCE_SMARTTHINGS_HOME_ASSISTANT": "SmartThings via Home Assistant",
   "SOURCE_SMARTTHINGS": "SmartThings"
