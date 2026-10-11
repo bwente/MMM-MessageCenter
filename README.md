@@ -440,7 +440,10 @@ events in its configuration:
 ```js
 gameEventNotifications: {
   enabled: true,
-  events: ["game.started", "game.halftime", "game.final"]
+  events: ["game.started", "game.halftime", "game.final"],
+  leagueEvents: {
+    USA_MLS: ["game.started", "game.halftime", "game.score", "game.final"]
+  }
 }
 ```
 
@@ -449,16 +452,24 @@ MessageCenter's adapter is enabled by default and can be disabled independently:
 ```js
 internalNotifications: {
   myScoreboard: {
-    enabled: true
+    enabled: true,
+    startedExpiresAfterMinutes: 120,
+    halftimeExpiresAfterMinutes: 45,
+    scoreExpiresAfterMinutes: 120,
+    finalExpiresAfterMinutes: 720
   }
 }
 ```
 
-Starts are retained as passive history. Halftime and final events create
-attention messages. Duplicate updates replace the same milestone silently and
-preserve its read state. Each milestone expires automatically so an old game
-does not remain indefinitely. `game.score` is intentionally ignored: it is too
-noisy for an ambient inbox in high-scoring sports.
+Starts are retained as passive history. Halftime, score, and final events create
+attention messages. Each distinct score is retained as its own update. Every
+event expires automatically; the defaults are two hours for starts and scores,
+45 minutes for halftime, and 12 hours for finals.
+
+Use MyScoreboard's `leagueEvents` overrides to opt low-scoring leagues into
+`game.score` without enabling score-by-score messages globally. In the example,
+MLS goals are included while NBA games continue to use the quieter global
+start, halftime, and final list.
 
 The source module remains responsible for selecting teams, retrieving scores,
 and deciding when a game reaches each milestone. MessageCenter only validates,

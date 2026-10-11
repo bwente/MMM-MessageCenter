@@ -27,6 +27,7 @@
   "SPORTS_MATCHUP": "{away} bei {home}",
   "SPORTS_GAME_STARTED": "Das Spiel hat begonnen. {away} {awayScore}, {home} {homeScore}.",
   "SPORTS_GAME_HALFTIME": "Halbzeit. {away} {awayScore}, {home} {homeScore}.",
+  "SPORTS_GAME_SCORE": "Spielstand. {away} {awayScore}, {home} {homeScore}.",
   "SPORTS_GAME_FINAL": "Endstand. {away} {awayScore}, {home} {homeScore}.",
   "SOURCE_HOME_ASSISTANT": "Home Assistant",
   "SOURCE_SMARTTHINGS_HOME_ASSISTANT": "SmartThings über Home Assistant",
