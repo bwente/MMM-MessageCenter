@@ -2,6 +2,21 @@
 
 All notable changes to MMM-MessageCenter are documented in this file.
 
+## 0.8.0 - 2026-10-10
+
+### Added
+
+- Present opt-in MyScoreboard score events, allowing the source module to send
+  goal updates for selected low-scoring leagues without enabling noisy updates
+  for every sport.
+- Add configurable expiration periods for game start, halftime, score, and
+  final messages.
+
+### Changed
+
+- Shorten the default game-start lifetime from six hours to two hours and the
+  default halftime lifetime from four hours to 45 minutes.
+
 ## 0.7.2 - 2026-10-10
 
 ### Fixed

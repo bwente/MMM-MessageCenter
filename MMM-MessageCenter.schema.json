@@ -105,7 +105,16 @@
                   }
                 },
                 "publicTransportHub": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } },
-                "myScoreboard": { "type": "object", "properties": { "enabled": { "type": "boolean", "default": true } } }
+                "myScoreboard": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": true },
+                    "startedExpiresAfterMinutes": { "type": "integer", "minimum": 1, "default": 120 },
+                    "halftimeExpiresAfterMinutes": { "type": "integer", "minimum": 1, "default": 45 },
+                    "scoreExpiresAfterMinutes": { "type": "integer", "minimum": 1, "default": 120 },
+                    "finalExpiresAfterMinutes": { "type": "integer", "minimum": 1, "default": 720 }
+                  }
+                }
               }
             },
             "webhook": {
@@ -207,7 +216,11 @@
             { "key": "MMM-MessageCenter.config.internalNotifications.generic.enabled", "title": "Automatic common alert capture" },
             { "key": "MMM-MessageCenter.config.internalNotifications.remoteControl.enabled", "title": "MMM-Remote-Control adapter" },
             { "key": "MMM-MessageCenter.config.internalNotifications.publicTransportHub.enabled", "title": "MMM-PublicTransportHub adapter" },
-            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.enabled", "title": "MMM-MyScoreboard adapter" }
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.enabled", "title": "MMM-MyScoreboard adapter" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.startedExpiresAfterMinutes", "title": "Game-start lifetime (minutes)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.halftimeExpiresAfterMinutes", "title": "Halftime lifetime (minutes)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.scoreExpiresAfterMinutes", "title": "Score-update lifetime (minutes)" },
+            { "key": "MMM-MessageCenter.config.internalNotifications.myScoreboard.finalExpiresAfterMinutes", "title": "Final-score lifetime (minutes)" }
           ]
         },
         {

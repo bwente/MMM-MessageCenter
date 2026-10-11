@@ -3,18 +3,28 @@
     "game.started": {
       urgency: "passive",
       retention: "archive",
-      expiresAfterMinutes: 360,
+      expiresConfig: "startedExpiresAfterMinutes",
+      expiresAfterMinutes: 120,
       bodyKey: "SPORTS_GAME_STARTED"
     },
     "game.halftime": {
       urgency: "attention",
       retention: "untilViewed",
-      expiresAfterMinutes: 240,
+      expiresConfig: "halftimeExpiresAfterMinutes",
+      expiresAfterMinutes: 45,
       bodyKey: "SPORTS_GAME_HALFTIME"
+    },
+    "game.score": {
+      urgency: "attention",
+      retention: "untilViewed",
+      expiresConfig: "scoreExpiresAfterMinutes",
+      expiresAfterMinutes: 120,
+      bodyKey: "SPORTS_GAME_SCORE"
     },
     "game.final": {
       urgency: "attention",
       retention: "untilViewed",
+      expiresConfig: "finalExpiresAfterMinutes",
       expiresAfterMinutes: 720,
       bodyKey: "SPORTS_GAME_FINAL"
     }
@@ -53,7 +63,8 @@
       if (!away || !home || awayScore === null || homeScore === null) return false;
 
       const source = "magicmirror.my-scoreboard";
-      const id = `${payload.gameId.trim()}:${payload.event}`;
+      const scoreSuffix = payload.event === "game.score" ? `:${awayScore}-${homeScore}` : "";
+      const id = `${payload.gameId.trim()}:${payload.event}${scoreSuffix}`;
       const existing = module.messages.find((message) => message.source === source && message.id === id);
       const timestamp = Number.isFinite(Number(payload.timestamp)) && Number(payload.timestamp) > 0
         ? Number(payload.timestamp)
@@ -70,7 +81,11 @@
         retention: eventConfig.retention,
         timestamp,
         unread: existing ? existing.unread : eventConfig.urgency !== "passive",
-        expires: timestamp + eventConfig.expiresAfterMinutes * 60 * 1000
+        expires: timestamp + (
+          Number.isFinite(Number(config[eventConfig.expiresConfig])) && Number(config[eventConfig.expiresConfig]) > 0
+            ? Number(config[eventConfig.expiresConfig])
+            : eventConfig.expiresAfterMinutes
+        ) * 60 * 1000
       }, { honorState: Boolean(existing), showToast: !existing });
     }
   });

@@ -103,8 +103,10 @@ as applicable. Sender-authored titles and bodies must remain untranslated.
 The bundled `my-scoreboard` adapter is an example of milestone normalization.
 MMM-MyScoreboard remains responsible for followed teams and game-state
 detection; its `MYSCOREBOARD_GAME_EVENT` broadcast contains neutral game data.
-MessageCenter turns start, halftime, and final milestones into short-lived
-ambient messages while deliberately ignoring per-score events.
+MessageCenter turns start, halftime, score, and final milestones into
+short-lived ambient messages. The source module decides which leagues emit
+score events, so low-scoring sports can opt in without making basketball or
+other high-scoring sports noisy.
 
 ## Requesting an adapter
 

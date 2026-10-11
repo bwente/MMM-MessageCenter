@@ -69,7 +69,11 @@ Module.register("MMM-MessageCenter", {
         enabled: true
       },
       myScoreboard: {
-        enabled: true
+        enabled: true,
+        startedExpiresAfterMinutes: 120,
+        halftimeExpiresAfterMinutes: 45,
+        scoreExpiresAfterMinutes: 120,
+        finalExpiresAfterMinutes: 720
       }
     },
     webhook: {

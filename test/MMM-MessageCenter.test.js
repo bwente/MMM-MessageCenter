@@ -1301,7 +1301,7 @@ test("ignores malformed, unrelated, and recursively emitted transit alerts", () 
   assert.equal(module.notifications.length, 0);
 });
 
-test("normalizes MyScoreboard start, halftime, and final milestones", () => {
+test("normalizes MyScoreboard start, halftime, and final milestones with calm lifetimes", () => {
   const module = instance();
   const sender = { name: "MMM-MyScoreboard" };
   const base = {
@@ -1356,6 +1356,59 @@ test("normalizes MyScoreboard start, halftime, and final milestones", () => {
   assert.equal(module.messages[0].source, "magicmirror.my-scoreboard");
   assert.equal(module.messages[0].entityId, "NBA:MIA@ORL");
   assert.equal(module.messages[0].expires, base.timestamp + 12 * 60 * 60000);
+  assert.equal(module.messages[1].expires, base.timestamp + 45 * 60000);
+  assert.equal(module.messages[2].expires, base.timestamp + 2 * 60 * 60000);
+});
+
+test("normalizes distinct opt-in MyScoreboard score events", () => {
+  const module = instance();
+  const sender = { name: "MMM-MyScoreboard" };
+  const base = {
+    event: "game.score",
+    league: "USA_MLS",
+    gameId: "USA_MLS:CLB@ORL",
+    timestamp: Date.now(),
+    away: { name: "Columbus Crew", score: 0 },
+    home: { name: "Orlando City SC", score: 1 }
+  };
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", base, sender);
+  module.notificationReceived(
+    "MYSCOREBOARD_GAME_EVENT",
+    { ...base, timestamp: base.timestamp + 60000, home: { name: "Orlando City SC", score: 2 } },
+    sender
+  );
+
+  assert.deepEqual(module.messages.map(({ id, body }) => ({ id, body })), [
+    {
+      id: "USA_MLS:CLB@ORL:game.score:0-2",
+      body: "Score update. Columbus Crew 0, Orlando City SC 2."
+    },
+    {
+      id: "USA_MLS:CLB@ORL:game.score:0-1",
+      body: "Score update. Columbus Crew 0, Orlando City SC 1."
+    }
+  ]);
+  assert.equal(module.messages[0].expires, base.timestamp + 60000 + 2 * 60 * 60000);
+});
+
+test("allows MyScoreboard event lifetimes to be configured", () => {
+  const module = instance({
+    internalNotifications: {
+      myScoreboard: { enabled: true, halftimeExpiresAfterMinutes: 20 }
+    }
+  });
+  const timestamp = Date.now();
+
+  module.notificationReceived("MYSCOREBOARD_GAME_EVENT", {
+    event: "game.halftime",
+    gameId: "NBA:MIA@ORL",
+    timestamp,
+    home: { name: "Orlando Magic", score: 55 },
+    away: { name: "Miami Heat", score: 49 }
+  }, { name: "MMM-MyScoreboard" });
+
+  assert.equal(module.messages[0].expires, timestamp + 20 * 60000);
 });
 
 test("updates a duplicate MyScoreboard milestone silently and preserves read state", () => {
@@ -1414,7 +1467,7 @@ test("ignores noisy, malformed, unrelated, and recursive MyScoreboard events", (
     null,
     [],
     {},
-    { ...validTeams, event: "game.score" },
+    { ...validTeams, event: "game.timeout" },
     { ...validTeams, event: "game.final", home: {} }
   ]) module.notificationReceived("MYSCOREBOARD_GAME_EVENT", payload, sender);
   module.notificationReceived(
